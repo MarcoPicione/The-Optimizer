@@ -13,7 +13,8 @@ class MOPSO(Optimizer):
                  objective,
                  lower_bounds, upper_bounds, num_particles=50,
                  inertia_weight=0.5, cognitive_coefficient=1, social_coefficient=1,
-                 incremental_pareto=True, initial_particles_position='random', default_point=None):
+                 incremental_pareto=True, initial_particles_position='random', default_point=None,
+                 use_reinforcement_learning = False):
         self.objective = objective
         if FileManager.loading_enabled:
             try:
@@ -107,6 +108,8 @@ class MOPSO(Optimizer):
         self.iteration = 0
         self.incremental_pareto = incremental_pareto
         self.pareto_front = []
+
+        self.use_reinforcement_learning = use_reinforcement_learning
 
     def check_types(self):
         lb_types = [type(lb) for lb in self.lower_bounds]
@@ -280,8 +283,9 @@ class MOPSO(Optimizer):
 
     def step(self):
         Logger.debug(f"Iteration {self.iteration}")
+        mask = None if self.use_reinforcement_learning else np.array([True] * len(self.particles))
         optimization_output = self.objective.evaluate(
-            [particle.position for particle in self.particles])
+            np.array([particle.position for particle in self.particles]), mask)
         [particle.set_fitness(optimization_output[p_id])
             for p_id, particle in enumerate(self.particles)]
         FileManager.save_csv([np.concatenate([particle.position, np.ravel(
