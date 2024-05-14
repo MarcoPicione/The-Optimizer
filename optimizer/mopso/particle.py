@@ -77,7 +77,7 @@ class Particle:
             fitness (numpy.ndarray): The fitness values of the particle for each objective.
         """
         self.fitness = fitness
-        self.update_best()
+        return self.update_best()
 
     def set_position(self, position):
         self.position = position
@@ -96,7 +96,9 @@ class Particle:
         # if np.any(self.best_fitness == np.zeros(self.num_objectives)):
         #     self.fitness = np.ones(self.num_objectives)
         if np.all(self.fitness <= self.best_fitness):
-            self.best_fitness = self.fitness
-            self.best_position = self.position
+            self.best_fitness = self.fitness.copy()
+            self.best_position = self.position.copy()
+            return True
+        return False
 
 
