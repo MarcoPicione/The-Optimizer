@@ -78,7 +78,7 @@ def main():
     env_fn = pso_environment_AEC
     env_kwargs = {'pso' : pso,
                 'num_iterations' : 100,
-                'metric_reward' : 1,
+                'metric_reward' : 5,
                 'evaluation_penalty' : -1,
                 'render_mode' : None
                   }

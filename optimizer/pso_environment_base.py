@@ -103,7 +103,9 @@ class pso_environment_base:
             hv = hyper_volume([p.fitness for p in self.pso.pareto_front], self.ref_point)
             for id in range(self.num_agents):
                 p = self.pso.particles[id]
-                self.last_rewards[id] = self.metric_reward * hv + self.evaluation_penalty * sum(self.action_list)#Is the shape right? Weight to reward
+                print(self.metric_reward * hv)
+                print(self.evaluation_penalty * sum(self.action_list))
+                self.last_rewards[id] = self.metric_reward * hv + self.evaluation_penalty * sum(self.action_list) / self.num_agents #Is the shape right? Weight to reward
                 self.rewards[id] += self.last_rewards[id]
 
             self.pso.iteration += 1
