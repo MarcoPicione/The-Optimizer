@@ -30,7 +30,7 @@ def zdt1_objective2(x):
 
 use_reinforcement_learning = 0
 
-optimizer.Randomizer.rng = np.random.default_rng(42)
+optimizer.Randomizer.rng = np.random.default_rng(43)
 
 optimizer.FileManager.working_dir = "tmp/zdt1/"
 optimizer.FileManager.loading_enabled = False

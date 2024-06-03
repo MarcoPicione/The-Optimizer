@@ -32,7 +32,8 @@ class ElementWiseObjective(Objective):
     def __init__(self, objective_functions, num_objectives=None) -> None:
         super().__init__(objective_functions, num_objectives)
 
-    def evaluate(self, items, mask):
+    def evaluate(self, items, mask = None):
+        if mask is None: mask = np.full((len(items)), True, dtype=bool)
         outputs = [[obj_func(item) for obj_func in self.objective_functions] for item in items[mask]]
         return np.array(self.populate_matrix(outputs, mask))
 

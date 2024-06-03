@@ -14,7 +14,7 @@ class MOPSO(Optimizer):
                  lower_bounds, upper_bounds, num_particles=50,
                  inertia_weight=0.5, cognitive_coefficient=1, social_coefficient=1,
                  incremental_pareto=True, initial_particles_position='random', default_point=None,
-                 use_reinforcement_learning = False, masks = None):
+                 use_reinforcement_learning = False):
         self.objective = objective
         if FileManager.loading_enabled:
             try:
@@ -110,7 +110,6 @@ class MOPSO(Optimizer):
         self.pareto_front = []
 
         self.use_reinforcement_learning = use_reinforcement_learning
-        self.masks = masks
 
     def check_types(self):
         lb_types = [type(lb) for lb in self.lower_bounds]
@@ -282,15 +281,23 @@ class MOPSO(Optimizer):
                                best_fitness=None)
             self.pareto_front.append(particle)
 
-    def step(self):
+    def step(self, mask = None):
         Logger.debug(f"Iteration {self.iteration}")
-        mask = np.array(self.masks[self.iteration], dtype = bool)
+        if mask is None:
+            if self.use_reinforcement_learning:
+                raise  Exception("Mask is None")
+            else:
+                mask = np.full(self.num_particles, True, dtype=bool)
+        else:
+            if len(mask) != self.num_particles:
+                raise Exception("Mask must be of length num_particles")
+            
         optimization_output = self.objective.evaluate(
             np.array([particle.position for particle in self.particles]), mask)
+        self.remove_inf(mask)
         improving_evaluations = [particle.set_fitness(optimization_output[p_id])
             for p_id, particle in enumerate(self.particles)]
-        self.remove_inf(mask)
-        self.useful_evaluations.append(improving_evaluations)
+        # self.useful_evaluations.append(improving_evaluations)
         FileManager.save_csv([np.concatenate([particle.position, np.ravel(
                                 particle.fitness)]) for particle in self.particles],
                                 'history/iteration' + str(self.iteration) + '.csv')
@@ -305,15 +312,21 @@ class MOPSO(Optimizer):
             particle.update_position(self.lower_bounds, self.upper_bounds)
 
         self.iteration += 1
+        return improving_evaluations
+
+
         
     def optimize(self, num_iterations=100, max_iter_no_improv=None):
         Logger.info("Starting MOPSO optimization")
         self.useful_evaluations = []
         pareto_len = []
-        if self.masks is None: self.masks = np.ones((num_iterations, self.num_particles), dtype=bool)
+        crowding_distances = []
+        self.num_iterations = num_iterations
+
         for _ in range(num_iterations):
             self.step()
             pareto_len.append(len(self.pareto_front))
+            crowding_distances.append(list(self.calculate_crowding_distance(self.particles).values()))
 
         Logger.info("MOPSO optimization finished")
 
@@ -322,6 +335,7 @@ class MOPSO(Optimizer):
 
         FileManager.save_csv(self.useful_evaluations, 'useful_evaluations_' + str(self.use_reinforcement_learning) + '.csv')
         FileManager.save_csv(pareto_len, 'pareto_len_' + str(self.use_reinforcement_learning) +'.csv')
+        FileManager.save_csv(crowding_distances, 'crowding_distances_' + str(self.use_reinforcement_learning) +'.csv')
         return self.pareto_front
 
     def update_pareto_front(self):

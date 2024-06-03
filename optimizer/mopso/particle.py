@@ -27,6 +27,7 @@ class Particle:
         self.best_position = self.position
         self.best_fitness = np.array([np.inf]*self.num_objectives)
         self.fitness = np.ones(self.num_objectives)
+        self.num_skips = 0
 
     def update_velocity(self,
                         pareto_front, inertia_weight=0.5,
