@@ -6,7 +6,8 @@ import copy
 
 def hyper_volume(pareto_front, ref_point, real_pareto = None, hv_real = 1):
     # if real_pareto is not None: hv_real = wfg(real_pareto, ref_point)
-    return wfg(pareto_front, ref_point) / hv_real
+    
+    return wfg(sorted(pareto_front, key=lambda x: x[0]), ref_point) / hv_real
 
 def wfg(pareto_front, ref_point):
     """
