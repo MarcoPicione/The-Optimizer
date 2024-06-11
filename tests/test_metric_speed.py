@@ -3,6 +3,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 import matplotlib.patches as patches
 import time
+from pymoo.indicators.hv import HV
 
 hv_times = []
 ref_point = [1,1]
@@ -24,7 +25,8 @@ plt.figure()
 plt.scatter(pareto[:,0], pareto[:,1])
 plt.show()
 start = time.time()
-hv = hyper_volume(pareto, ref_point)
+ind = HV(ref_point=ref_point)
+hv = ind(pareto)
 end = time.time()
 diff = end - start
 print(diff)
