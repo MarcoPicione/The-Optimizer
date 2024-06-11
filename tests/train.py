@@ -59,12 +59,12 @@ def train_butterfly_supersuit(
     model = PPO(
         MlpPolicy,
         env,
-        verbose=3,
+        verbose=2,
         learning_rate=1e-3,
         batch_size=256,
     )
 
-    model.learn(total_timesteps=steps)
+    model.learn(total_timesteps=steps, progress_bar=True)
 
     model.save(f"{env.unwrapped.metadata.get('name')}_{time.strftime('%Y%m%d-%H%M%S')}")
 
@@ -84,7 +84,7 @@ def main():
                   }
 
     # Train a model (takes ~3 minutes on GPU)
-    train_butterfly_supersuit(env_fn, steps=196_608, seed=0, **env_kwargs)
+    train_butterfly_supersuit(env_fn, steps=200000, seed=0, **env_kwargs)
 
 if __name__ == "__main__":
     main()
