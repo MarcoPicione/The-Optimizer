@@ -13,7 +13,7 @@ class pso_environment_base:
         self.num_agents = self.possible_pso.num_particles
         self.metric_reward = metric_reward
         self.evaluation_penalty = evaluation_penalty
-        self.ref_point = [1,1]
+        self.ref_point = [5,5]
 
 
         self.last_dones = [False for _ in range(self.num_agents)]
@@ -101,14 +101,14 @@ class pso_environment_base:
             self.last_obs = obs_list
 
             # if self.pso.iteration == self.num_iterations:
-            print("Mopso iteration ", self.pso.iteration)
-            print("Pareto dim ", len(self.pso.pareto_front))
+            # print("Mopso iteration ", self.pso.iteration)
+            # print("Pareto dim ", len(self.pso.pareto_front))
             
-            start = time.time()
+            # start = time.time()
             hv = hyper_volume([p.fitness for p in self.pso.pareto_front], self.ref_point)
             # print(hv)
-            end = time.time()
-            print(end - start)
+            # end = time.time()
+            # print(end - start)
             for id in range(self.num_agents):
                 p = self.pso.particles[id]
                 # print(self.metric_reward * hv)
