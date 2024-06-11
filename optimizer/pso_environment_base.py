@@ -1,8 +1,9 @@
 import numpy as np
 from gymnasium.spaces import Discrete, Box
 import copy
-from .metrics import hyper_volume
+from .metrics import hyper_volume, stupid_hv
 from optimizer import Randomizer
+import time
 
 class pso_environment_base:
     def __init__(self, pso, num_iterations, metric_reward, evaluation_penalty, render_mode = None):
@@ -100,17 +101,22 @@ class pso_environment_base:
             self.last_obs = obs_list
 
             # if self.pso.iteration == self.num_iterations:
+            print("Mopso iteration ", self.pso.iteration)
+            print("Pareto dim ", len(self.pso.pareto_front))
+            
+            start = time.time()
             hv = hyper_volume([p.fitness for p in self.pso.pareto_front], self.ref_point)
+            # print(hv)
+            end = time.time()
+            print(end - start)
             for id in range(self.num_agents):
                 p = self.pso.particles[id]
-                print(self.metric_reward * hv)
-                print(self.evaluation_penalty * sum(self.action_list))
+                # print(self.metric_reward * hv)
+                # print(self.evaluation_penalty * sum(self.action_list))
                 self.last_rewards[id] = self.metric_reward * hv + self.evaluation_penalty * sum(self.action_list) / self.num_agents #Is the shape right? Weight to reward
                 self.rewards[id] += self.last_rewards[id]
 
             self.pso.iteration += 1
-            print("Iter ", self.pso.iteration)
-            print("Pareto dim ", len(self.pso.pareto_front))
             self.action_list = []
 
             # rewards = np.array(self.rewards)

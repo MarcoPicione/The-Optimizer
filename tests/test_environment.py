@@ -6,6 +6,8 @@ import supersuit as ss
 from stable_baselines3.ppo import MlpPolicy
 import time
 
+from pettingzoo.test import parallel_api_test, parallel_seed_test
+
 
 num_agents = 50
 num_iterations = 100
@@ -75,16 +77,18 @@ def train_butterfly_supersuit(
     env.close()
 
 def main():
-    env_fn = pso_environment_AEC
     env_kwargs = {'pso' : pso,
                 'num_iterations' : 100,
                 'metric_reward' : 5,
                 'evaluation_penalty' : -1,
                 'render_mode' : None
                   }
-
-    # Train a model (takes ~3 minutes on GPU)
-    train_butterfly_supersuit(env_fn, steps=196_608, seed=0, **env_kwargs)
+    
+    env_fn = pso_environment_AEC.parallel_env
+    env = pso_environment_AEC.parallel_env(**env_kwargs)
+    
+    # parallel_seed_test(env_fn, num_cycles=10)
+    parallel_api_test(env, num_cycles=100000)
 
 if __name__ == "__main__":
     main()

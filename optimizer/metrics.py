@@ -1,10 +1,13 @@
 #from .mopso.mopso import get_dominated
+from numba import njit, jit
 import numpy as np
+import copy
 
-def hyper_volume(pareto_front, ref_point, real_pareto = None):
-    hv_real = wfg(real_pareto, ref_point) if real_pareto is not None else 1
+
+def hyper_volume(pareto_front, ref_point, real_pareto = None, hv_real = 1):
+    # if real_pareto is not None: hv_real = wfg(real_pareto, ref_point)
     return wfg(pareto_front, ref_point) / hv_real
-    
+
 def wfg(pareto_front, ref_point):
     """
     Calculate the hypervolume for a given set of points.
@@ -19,7 +22,14 @@ def wfg(pareto_front, ref_point):
     float
         The hypervolume, which is the sum of exclusive hypervolumes of the provided points.
     """
-    return sum([exclhv(pareto_front, k, ref_point) for k in range(len(pareto_front))])
+    if len(pareto_front) == 0: 
+        return 0
+    else:
+        # return np.sum([exclhv(pareto_front, k, ref_point) for k in range(len(pareto_front))])
+        sum = 0
+        for k in range(len(pareto_front)):
+            sum = sum + exclhv(pareto_front, k, ref_point)
+        return sum
 
 def exclhv(pareto_front, k, ref_point):
     """
@@ -27,14 +37,20 @@ def exclhv(pareto_front, k, ref_point):
     is the size of the part of objective space that is dominated by p but is 
     not dominated by any member of S
     """
-    return inclhv(pareto_front[k], ref_point) - wfg(nds(limitset(pareto_front, k)), ref_point)
+    limited_set = limitset(pareto_front, k)
+    result = inclhv(pareto_front[k], ref_point)
+    if len(limited_set) > 0:
+        result = result - wfg(nds(limited_set), ref_point)
+    return  result
 
+@njit
 def inclhv(p, ref_point):
     volume = 1
     for i in range(len(p)):
-        volume *= abs(p[i] - ref_point[i])
+        volume = volume * abs(p[i] - ref_point[i])
     return volume
 
+@njit
 def limitset(pareto_front, k):
     # n = 2 #? Dimension of each point in the pareto
     # ql = np.full((len(pareto_front) - k, n), -np.inf)
@@ -42,51 +58,37 @@ def limitset(pareto_front, k):
     #     for j in range(1, n):
     #         ql[i][j] = np.max((pareto_front[k][j], pareto_front[k + i][j]))
     # ql = ql[1:][:,1]
-    return [[max(p,q) for (p,q) in zip(pareto_front[k], pareto_front[j+k+1])]
-            for j in range(len(pareto_front)-k-1)]
+    # return np.array([[max(p,q) for (p,q) in zip(pareto_front[k], pareto_front[j+k+1])]
+    #         for j in range(len(pareto_front)-k-1)])
 
+    m = len(pareto_front) - k - 1
+    n = len(pareto_front[0])
+    result = np.empty((m, n))
+    for j in range(m):
+        l = np.empty(n)
+        for i in range(n):
+            p = pareto_front[k][i]
+            q = pareto_front[j+k+1][i]
+            l[i] = p if p > q else q
+        result[j] = l
+    return result
+
+@njit
 def nds(front):
     """
     return the nondominated solutions from a set of points
     """
-    # archive = []
-
-    # for row in front:
-    #     asize = len(archive)
-    #     ai = -1
-    #     while ai < asize - 1:
-    #         ai += 1
-    #         adominate = False
-    #         sdominate = False
-    #         nondominate = False
-    #         for arc, sol in zip(archive[ai], row):
-    #             if arc < sol:
-    #                 adominate = True
-    #                 if sdominate:
-    #                     nondominate = True
-    #                     break # stop comparing objectives
-    #             elif arc > sol:
-    #                 sdominate = True
-    #                 if adominate:
-    #                     nondominate = True
-    #                     break # stop comparing objectives
-    #         if nondominate:
-    #             continue # compare next archive solution
-    #         if adominate:
-    #             break    # row is dominated
-    #         if sdominate:
-    #             archive.pop(ai)
-    #             ai -= 1
-    #             asize -= 1
-    #             continue # compare next archive solution
-    #     # if the solution made it all the way through, keep it
-    #     archive.append(row)
-    # return archive
-    return np.array(front)[np.invert(get_dominated(front, 0))]
-
+    # front = np.array(front)
+    # if len(front) == 0:
+    #     return np.array([], dtype=np.float64)
+    if len(front) == 1:
+        return front
+    else:
+        return front[np.invert(get_dominated(front, 0))]
+     
+@njit
 def get_dominated(particles, pareto_lenght):
-    particles = np.array(particles)
-    dominated_particles = np.full(len(particles), False, dtype=bool)
+    dominated_particles = np.full(len(particles), False)
     for i in range(len(particles)):
         dominated = False
         for j in range(pareto_lenght, len(particles)):
@@ -94,6 +96,17 @@ def get_dominated(particles, pareto_lenght):
                     np.all(particles[i] >= particles[j]):
                 dominated = True
                 break
-        dominated_particles[i] = dominated
-
+        dominated_particles[i] = dominated  
     return dominated_particles
+
+def first(x):
+    return x[0]
+
+def stupid_hv(pareto_front, ref_point):
+    # pareto_front_copy = copy.deepcopy(pareto_front)
+    # pareto_front_copy = pareto_front_copy.sort(key=first)
+    pareto_front_sorted = sorted(pareto_front, key=lambda x: x[0])
+    hv = (ref_point[0] - pareto_front_sorted[0][0]) * (ref_point[1] - pareto_front_sorted[0][1])
+    for i in range(1, len(pareto_front_sorted)):
+        hv = hv + (ref_point[0] - pareto_front_sorted[i][0]) * (pareto_front_sorted[i - 1][1] - pareto_front_sorted[i][1])
+    return hv
