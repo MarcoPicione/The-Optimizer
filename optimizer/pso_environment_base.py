@@ -7,6 +7,7 @@ import time
 from pymoo.indicators.hv import HV
 import math
 from copy import deepcopy
+from numba import njit, jit
 
 class pso_environment_base:
     def __init__(self, pso, pso_iterations, metric_reward, evaluation_penalty, not_dominated_reward, render_mode = None):
@@ -183,8 +184,10 @@ class pso_environment_base:
             # distance_best = np.linalg.norm(best_position - particle.position) / self.distance_normalization
             # progress = self.pso.iteration / self.pso_iterations
 
-            distance_good_points = self.distance_from_cluster(particle, self.good_points)
-            distance_bad_points = self.distance_from_cluster(particle, self.bad_points)
+            distance_good_points = distance_from_cluster(particle.velocity, particle.position, self.good_points) if len(self.good_points) > 0 else 1
+            distance_bad_points = distance_from_cluster(particle.velocity, particle.position, self.bad_points) if len(self.good_points) > 0 else 1
+            distance_good_points = distance_good_points / self.distance_normalization
+            distance_bad_points = distance_bad_points / self.distance_normalization
 
 
             particle_observation = [
@@ -200,27 +203,55 @@ class pso_environment_base:
 
         return observe_list
 
-    def distance_from_cluster(self, particle, points):
-        v = particle.velocity
-        position = np.array(particle.position)
-        saved_points = []
-        for point in points:
-            u = np.array(point) - position
-            # print(np.dot(v,u) / (np.linalg.norm(v) * np.linalg.norm(u)))
-            # print(v)
-            # print(u)
-            # print(np.dot(v,u))
+    # @njit
+    # def distance_from_cluster(self, particle, points):
+    #     v = particle.velocity
+    #     position = np.array(particle.position)
+    #     saved_points = []
+    #     for point in points:
+    #         u = np.array(point) - position
+    #         # print(np.dot(v,u) / (np.linalg.norm(v) * np.linalg.norm(u)))
+    #         # print(v)
+    #         # print(u)
+    #         # print(np.dot(v,u))
 
-            angle_rad = math.acos(round(np.dot(v,u) / (np.linalg.norm(v) * np.linalg.norm(u)), 2))
-            angle_deg = angle_rad * 180 / np.pi
-            if angle_deg < self.theta:
-                saved_points.append(np.array(point))
+    #         angle_rad = math.acos(round(np.dot(v,u) / (np.linalg.norm(v) * np.linalg.norm(u)), 2))
+    #         angle_deg = angle_rad * 180 / np.pi
+    #         if angle_deg < self.theta:
+    #             saved_points.append(np.array(point))
         
-        if len(saved_points) > 1:
-            mean_position = np.mean(saved_points, axis = 0)
-            return np.linalg.norm(position - mean_position)
-        elif len(saved_points) == 1:
-            return np.linalg.norm(position - saved_points[0])
-        else:
-            return 1
+    #     if len(saved_points) > 1:
+    #         mean_position = np.mean(saved_points, axis = 0)
+    #         return np.linalg.norm(position - mean_position)
+    #     elif len(saved_points) == 1:
+    #         return np.linalg.norm(position - saved_points[0])
+    #     else:
+    #         return 1
+@njit
+def distance_from_cluster(particle_velocity, particle_position, points):
+    v = particle_velocity
+    position = particle_position
+    mask = np.full(len(points), False)
+    for i, point in enumerate(points):
+        u = point - position
+        angle_rad = math.acos(round(np.dot(v,u) / (np.linalg.norm(v) * np.linalg.norm(u)), 2))
+        angle_deg = angle_rad * 180 / np.pi
+        if angle_deg < 20:
+            mask[i] = True
+    
+    if sum(mask) > 1:
+        mean_position = np.zeros(30)
+        for i in range(len(points)):
+            for j in range(len(points[0])):
+                mean_position[j] = mean_position[j] + points[i][j]
         
+        for j in range(len(mean_position)):
+                mean_position[j] = mean_position[j] / len(points)
+
+        return np.linalg.norm(position - mean_position)
+    elif sum(mask) == 1:
+        for i in range(len(mask)):
+        return np.linalg.norm(position - points[mask])
+    else:
+        return 1
+               
