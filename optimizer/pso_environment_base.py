@@ -206,14 +206,18 @@ class pso_environment_base:
         saved_points = []
         for point in points:
             u = np.array(point) - position
-            print(np.dot(v,u) / (np.linalg.norm(v) * np.linalg.norm(u)))
-            angle_rad = math.acos(np.dot(v,u) / (np.linalg.norm(v) * np.linalg.norm(u)))
+            # print(np.dot(v,u) / (np.linalg.norm(v) * np.linalg.norm(u)))
+            # print(v)
+            # print(u)
+            # print(np.dot(v,u))
+
+            angle_rad = math.acos(round(np.dot(v,u) / (np.linalg.norm(v) * np.linalg.norm(u)), 2))
             angle_deg = angle_rad * 180 / np.pi
             if angle_deg < self.theta:
                 saved_points.append(np.array(point))
         
         if len(saved_points) > 1:
-            mean_position = np.mean(saved_points, axis = 1)
+            mean_position = np.mean(saved_points, axis = 0)
             return np.linalg.norm(position - mean_position)
         elif len(saved_points) == 1:
             return np.linalg.norm(position - saved_points[0])
