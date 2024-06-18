@@ -28,6 +28,7 @@ class Particle:
         self.best_fitness = np.array([np.inf]*self.num_objectives)
         self.fitness = np.ones(self.num_objectives)
         self.num_skips = 0
+        self.iteration_from_best_position = 0
 
     def update_velocity(self,
                         pareto_front, inertia_weight=0.5,
@@ -99,7 +100,10 @@ class Particle:
         if np.all(self.fitness <= self.best_fitness):
             self.best_fitness = self.fitness.copy()
             self.best_position = self.position.copy()
+            self.iteration_from_best_position = 0
             return True
+        else:
+            self.iteration_from_best_position += 1
         return False
 
 

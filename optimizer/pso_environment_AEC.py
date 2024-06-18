@@ -5,6 +5,8 @@ from .pso_environment_base import pso_environment_base as _env
 from pettingzoo.utils import agent_selector, wrappers
 from pettingzoo.utils.conversions import parallel_wrapper_fn
 
+import copy
+
 
 def env(**kwargs):
     env = raw_env(**kwargs)
@@ -32,6 +34,7 @@ class raw_env(AECEnv, EzPickle):
         self.possible_agents = self.agents[:]
         self.agent_name_mapping = dict(zip(self.agents, list(range(self.num_agents))))
         self._agent_selector = agent_selector(self.agents)
+        self.pso_iterations = kwargs['pso_iterations']
 
         # spaces
         self.action_spaces = dict(zip(self.agents, self.env.action_space))
@@ -58,9 +61,10 @@ class raw_env(AECEnv, EzPickle):
         self.agent_selection = self._agent_selector.next()
         self.rewards = dict(zip(self.agents, [(0) for _ in self.agents]))
         self._cumulative_rewards = dict(zip(self.agents, [(0) for _ in self.agents]))
+        self.cumultaive_rewards = []
         self.terminations = dict(zip(self.agents, [False for _ in self.agents]))
         self.truncations = dict(zip(self.agents, [False for _ in self.agents]))
-        self.infos = dict(zip(self.agents, [{} for _ in self.agents]))
+        self.infos = dict(zip(self.agents, [{"cumulative_rewards" : []} for _ in self.agents]))
 
     def close(self):
         pass
@@ -69,10 +73,7 @@ class raw_env(AECEnv, EzPickle):
         pass
 
     def step(self, action):
-        if (
-            self.terminations[self.agent_selection]
-            or self.truncations[self.agent_selection]
-        ):
+        if (self.terminations[self.agent_selection] or self.truncations[self.agent_selection]):
             self._was_dead_step(action)
             return
 
@@ -84,10 +85,12 @@ class raw_env(AECEnv, EzPickle):
             for i in self.rewards:
                 self.rewards[i] = self.env.rewards[self.agent_name_mapping[i]]
 
-        self.truncations = dict(zip(self.agents, [False for _ in self.agents]))
+            self.truncations = dict(zip(self.agents, [False for _ in self.agents]))
+            if self.env.pso.iteration == self.pso_iterations:
+                self.terminations = dict(zip(self.agents, [True for _ in self.agents]))
+                
+            # self.cumultaive_rewards.append(copy.copy())
 
-        if self.env.pso.iteration == self.env.num_iterations:
-            self.terminations = dict(zip(self.agents, [True for _ in self.agents]))
 
         self._cumulative_rewards[self.agent_selection] = 0
         self.agent_selection = self._agent_selector.next()

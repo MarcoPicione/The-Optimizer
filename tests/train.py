@@ -5,10 +5,12 @@ from stable_baselines3 import PPO
 import supersuit as ss
 from stable_baselines3.ppo import MlpPolicy
 import time
+from matplotlib import pyplot as plt
+from optimizer import callback
 
 
-num_agents = 50
-num_iterations = 100
+num_agents = 100
+pso_iterations = 100
 num_params = 30
 
 lb = [0.] * num_params
@@ -42,9 +44,7 @@ pso = optimizer.MOPSO(objective=objective, lower_bounds=lb, upper_bounds=ub,
                       inertia_weight=0.6, cognitive_coefficient=1, social_coefficient=2, initial_particles_position='random', incremental_pareto=True, 
                       use_reinforcement_learning=use_reinforcement_learning)
 
-def train_butterfly_supersuit(
-    env_fn, steps: int = 10_000, seed: int = 0, **env_kwargs
-):
+def train_butterfly_supersuit(env_fn, steps: int = 1e4, seed: int = 0, **env_kwargs):
     # Train a single model to play as each agent in a cooperative Parallel environment
     env = env_fn.parallel_env(**env_kwargs)
 
@@ -53,38 +53,43 @@ def train_butterfly_supersuit(
     print(f"Starting training on {str(env.metadata['name'])}.")
 
     env = ss.pettingzoo_env_to_vec_env_v1(env)
-    env = ss.concat_vec_envs_v1(env, 1, num_cpus=2, base_class="stable_baselines3")
+    env = ss.concat_vec_envs_v1(env, num_vec_envs = 4, num_cpus=1, base_class="stable_baselines3")
 
     # Note: Waterworld's observation space is discrete (242,) so we use an MLP policy rather than CNN
     model = PPO(
         MlpPolicy,
         env,
         verbose=2,
-        learning_rate=1e-3,
+        learning_rate=1e-2,
         batch_size=256,
+        n_epochs = 10,
     )
 
-    model.learn(total_timesteps=steps, progress_bar=True)
+    model.learn(total_timesteps=steps, progress_bar=True, callback=callback.CustomCallback())
 
-    model.save(f"{env.unwrapped.metadata.get('name')}_{time.strftime('%Y%m%d-%H%M%S')}")
+    # model.save(f"{env.unwrapped.metadata.get('name')}_{time.strftime('%Y%m%d-%H%M%S')}")
+    model.save("model")
 
     print("Model has been saved.")
 
     print(f"Finished training on {str(env.unwrapped.metadata['name'])}.")
+
 
     env.close()
 
 def main():
     env_fn = pso_environment_AEC
     env_kwargs = {'pso' : pso,
-                'num_iterations' : 100,
-                'metric_reward' : 5,
+                'pso_iterations' : pso_iterations,
+                'metric_reward' : 100,
                 'evaluation_penalty' : -1,
+                'not_dominated_reward' : 1,
                 'render_mode' : None
                   }
 
     # Train a model (takes ~3 minutes on GPU)
-    train_butterfly_supersuit(env_fn, steps=200000, seed=0, **env_kwargs)
+    # Steps should be a multiple of (n_steps, num_env, num_agents)
+    train_butterfly_supersuit(env_fn, steps=1e8, seed=0, **env_kwargs)
 
 if __name__ == "__main__":
     main()

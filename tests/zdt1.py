@@ -9,7 +9,7 @@ import warnings
 warnings.filterwarnings("error")
 
 num_agents = 100
-num_iterations = 200
+num_iterations = 100
 num_params = 30
 
 lb = [0.] * num_params
@@ -34,15 +34,14 @@ optimizer.Randomizer.rng = np.random.default_rng(43)
 
 optimizer.FileManager.working_dir = "tmp/zdt1/"
 optimizer.FileManager.loading_enabled = False
-optimizer.FileManager.saving_enabled = True
+optimizer.FileManager.saving_enabled = False
 
-if use_reinforcement_learning: evaluation_mask = optimizer.FileManager.load_csv("useful_evaluations_0.csv")
 objective = optimizer.ElementWiseObjective([zdt1_objective1, zdt1_objective2])
 
 pso = optimizer.MOPSO(objective=objective, lower_bounds=lb, upper_bounds=ub,
                       num_particles=num_agents,
-                      inertia_weight=0.6, cognitive_coefficient=1, social_coefficient=2, initial_particles_position='random', incremental_pareto=True, 
-                      use_reinforcement_learning=use_reinforcement_learning, masks = evaluation_mask if use_reinforcement_learning else None)
+                      inertia_weight=0.6, cognitive_coefficient=2, social_coefficient=1, initial_particles_position='random', incremental_pareto=True, 
+                      use_reinforcement_learning=use_reinforcement_learning)
 
 # run the optimization algorithm
 pso.optimize(num_iterations)

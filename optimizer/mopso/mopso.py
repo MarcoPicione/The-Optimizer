@@ -1,4 +1,4 @@
-from copy import copy
+from copy import copy, deepcopy
 import itertools
 import math
 import numpy as np
@@ -7,6 +7,8 @@ from optimizer import Optimizer, FileManager, Randomizer, Logger
 from numba import njit, jit
 import scipy.stats as stats
 from .particle import Particle
+from pymoo.indicators.hv import HV
+from matplotlib import pyplot as plt
 
 class MOPSO(Optimizer):
     def __init__(self,
@@ -110,6 +112,9 @@ class MOPSO(Optimizer):
         self.pareto_front = []
 
         self.use_reinforcement_learning = use_reinforcement_learning
+        self.ind = HV(ref_point=[1,1])
+        self.differences = []
+        self.prev_hv = 0
 
     def check_types(self):
         lb_types = [type(lb) for lb in self.lower_bounds]
@@ -325,6 +330,10 @@ class MOPSO(Optimizer):
 
         for _ in range(num_iterations):
             self.step()
+            hv = self.ind(np.array([p.fitness for p in self.pareto_front]))
+            diff = hv - self.prev_hv
+            self.prev_hv = hv
+            self.differences.append(diff)
             pareto_len.append(len(self.pareto_front))
             crowding_distances.append(list(self.calculate_crowding_distance(self.particles).values()))
 
@@ -336,6 +345,11 @@ class MOPSO(Optimizer):
         FileManager.save_csv(self.useful_evaluations, 'useful_evaluations_' + str(self.use_reinforcement_learning) + '.csv')
         FileManager.save_csv(pareto_len, 'pareto_len_' + str(self.use_reinforcement_learning) +'.csv')
         FileManager.save_csv(crowding_distances, 'crowding_distances_' + str(self.use_reinforcement_learning) +'.csv')
+
+        plt.figure()
+        plt.plot(self.differences)
+        plt.savefig("HV_differences.png")
+        plt.close()
         return self.pareto_front
 
     def update_pareto_front(self):
@@ -344,19 +358,21 @@ class MOPSO(Optimizer):
         particles = self.pareto_front + self.particles
         particle_fitnesses = np.array(
             [particle.fitness for particle in particles])
-        dominanted = get_dominated(particle_fitnesses, pareto_lenght)
+        dominated = get_dominated(particle_fitnesses, pareto_lenght)
 
         if self.incremental_pareto:
-            self.pareto_front = [copy(particles[i]) for i in range(
-                len(particles)) if not dominanted[i]]
+            self.pareto_front = [deepcopy(particles[i]) for i in range(
+                len(particles)) if not dominated[i]]
         else:
-            self.pareto_front = [copy(particles[i]) for i in range(
-                pareto_lenght, len(particles)) if not dominanted[i]]
+            self.pareto_front = [deepcopy(particles[i]) for i in range(
+                pareto_lenght, len(particles)) if not dominated[i]]
         Logger.debug(f"New pareto front size: {len(self.pareto_front)}")
         crowding_distances = self.calculate_crowding_distance(
             self.pareto_front)
         self.pareto_front.sort(
             key=lambda x: crowding_distances[x], reverse=True)
+
+        return dominated
 
     def calculate_crowding_distance(self, pareto_front):
         if len(pareto_front) == 0:
