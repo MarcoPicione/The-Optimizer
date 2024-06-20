@@ -21,6 +21,7 @@ class Particle:
 
     def __init__(self, lower_bound, upper_bound, num_objectives, num_particles):
         self.position = np.asarray(lower_bound)
+        self.previous_position = np.asarray(lower_bound)
         self.num_objectives = num_objectives
         self.num_particles = num_particles
         self.velocity = np.zeros_like(self.position)
@@ -45,7 +46,10 @@ class Particle:
             social_coefficient (float): Social coefficient controlling the impact of global best
                                         (default is 1).
         """
-        leader = Randomizer.rng.choice(pareto_front)
+        while True:
+            leader = Randomizer.rng.choice(pareto_front)
+            if np.all(leader.position != self.position): 
+                break
         cognitive_random = Randomizer.rng.uniform(0, 1)
         social_random = Randomizer.rng.uniform(0, 1)
         cognitive = cognitive_coefficient * cognitive_random * \
@@ -62,10 +66,11 @@ class Particle:
             lower_bound (numpy.ndarray): Lower bound for the particle's position.
             upper_bound (numpy.ndarray): Upper bound for the particle's position.
         """
+        self.previous_position = self.position.copy()
         new_position = np.empty_like(self.position)
         for i in range(len(lower_bound)):
             if type(lower_bound[i]) == int or type(lower_bound[i]) == bool:
-                new_position[i] = np.round(self.position[i] + self.velocity[i])
+                new_position[i] = np.round(self.position[i] + self.velocity[i]) # per lr
             else:
                 new_position[i] = self.position[i] + self.velocity[i]
         self.position = np.clip(new_position, lower_bound, upper_bound)

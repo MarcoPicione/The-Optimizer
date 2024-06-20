@@ -61,8 +61,9 @@ def train_butterfly_supersuit(env_fn, steps: int = 1e4, seed: int = 0, **env_kwa
         env,
         verbose=2,
         learning_rate=1e-2,
-        batch_size=256,
-        n_epochs = 10,
+        n_steps=2048,
+        batch_size=2048,
+        n_epochs = 100,
     )
 
     model.learn(total_timesteps=steps, progress_bar=True, callback=callback.CustomCallback())
@@ -81,9 +82,9 @@ def main():
     env_fn = pso_environment_AEC
     env_kwargs = {'pso' : pso,
                 'pso_iterations' : pso_iterations,
-                'metric_reward' : 100,
+                'metric_reward' : 10,
                 'evaluation_penalty' : -1,
-                'not_dominated_reward' : 1,
+                'not_dominated_reward' : 5,
                 'render_mode' : None
                   }
 

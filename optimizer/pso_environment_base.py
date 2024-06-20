@@ -7,7 +7,7 @@ import time
 from pymoo.indicators.hv import HV
 import math
 from copy import deepcopy
-from numba import njit, jit
+from numba import njit, jit, prange
 
 class pso_environment_base:
     def __init__(self, pso, pso_iterations, metric_reward, evaluation_penalty, not_dominated_reward, render_mode = None):
@@ -29,7 +29,7 @@ class pso_environment_base:
 
         # state stuff
         self.ref_point = [5, 5]
-        self.theta = 20
+        self.angle = 20
         self.ind = HV(ref_point=self.ref_point)
         upper_bounds = np.array(self.possible_pso.upper_bounds)
         lower_bounds = np.array(self.possible_pso.lower_bounds)
@@ -38,13 +38,14 @@ class pso_environment_base:
     def get_spaces(self):
         """Define the action and observation spaces for all of the agents."""
 
-        low = np.array([0.] * 4)
-        high = np.array([np.inf] * 4)
+        len_obs = 6
+        low = np.array([0.] * len_obs)
+        high = np.array([np.inf] * len_obs)
 
         obs_space = Box(
             low = low,
             high = high,
-            shape=(4, ),
+            shape=(len_obs, ),
             dtype=np.float32,
         )
 
@@ -66,13 +67,21 @@ class pso_environment_base:
         self.bad_points = []
 
         # Evaluate all particles to begin with
-        mask = np.full(self.num_agents, True, dtype=bool)
-        optimization_output = self.pso.objective.evaluate(
-            np.array([particle.position for particle in self.pso.particles]), mask)
-        [particle.set_fitness(optimization_output[p_id])
-            for p_id, particle in enumerate(self.pso.particles)]
+        self.pso.step()
+        # mask = np.full(self.num_agents, True, dtype=bool)
+        # optimization_output = self.pso.objective.evaluate(
+        #     np.array([particle.position for particle in self.pso.particles]), mask)
+        # [particle.set_fitness(optimization_output[p_id])
+        #     for p_id, particle in enumerate(self.pso.particles)]
         
-        self.pso.update_pareto_front()
+        # self.pso.update_pareto_front()
+        # for particle in self.pso.particles:
+        #         particle.update_velocity(self.pso.pareto_front,
+        #                                     self.pso.inertia_weight,
+        #                                     self.pso.cognitive_coefficient,
+        #                                     self.pso.social_coefficient)
+        #         particle.update_position(self.pso.lower_bounds, self.pso.upper_bounds)
+
         self.prev_hv = self.ind(np.array([p.fitness for p in self.pso.pareto_front]))
         # print(self.prev_hv)      
         # obs_list = self.build_state()
@@ -86,10 +95,9 @@ class pso_environment_base:
 
         # Get observation
         obs_list = self.observe_list()
-
+        self.last_obs = obs_list
         self.last_rewards = [np.float64(0) for _ in range(self.num_agents)]
         self.last_dones = [False for _ in range(self.num_agents)]
-        self.last_obs = obs_list
 
         return obs_list[0]
 
@@ -107,9 +115,9 @@ class pso_environment_base:
             dominated = self.pso.update_pareto_front()
             for i in range(self.num_agents):
                 if dominated[i]:
-                    self.bad_points.append(deepcopy(self.pso.particles[i].position))
-                else:
-                    self.good_points.append(deepcopy(self.pso.particles[i].position))
+                    self.bad_points.append(self.pso.particles[i].position.copy())
+            #     else:
+            #         self.good_points.append(deepcopy(self.pso.particles[i].position))
 
             for particle in self.pso.particles:
                 particle.update_velocity(self.pso.pareto_front,
@@ -139,11 +147,18 @@ class pso_environment_base:
                 # print(self.metric_reward * hv)
                 # print(self.evaluation_penalty * sum(self.action_list))
                 positive_reward = diff_hv
-                negative_reward = sum(self.action_list) / self.num_agents
+                negative_reward = self.action_list[id]
 
                 # print("Rewards: ", positive_reward, " ", negative_reward)
-                self.last_rewards[id] = self.metric_reward * positive_reward + self.evaluation_penalty * negative_reward
-                self.last_rewards[id] += self.not_dominated_reward if not dominated[i] else 0
+                # self.last_rewards[id] = self.metric_reward * positive_reward + self.evaluation_penalty * negative_reward
+                self.last_rewards[id] = self.evaluation_penalty * negative_reward
+                self.last_rewards[id] += self.not_dominated_reward if not dominated[id] else 0
+
+                # print("Reward")
+                # print(self.metric_reward * positive_reward)
+                # print(self.evaluation_penalty * negative_reward)
+                # print(self.not_dominated_reward if not dominated[id] else 0)
+
                 self.rewards[id] = self.last_rewards[id]
 
             self.pso.iteration += 1
@@ -157,8 +172,7 @@ class pso_environment_base:
         return np.array(self.last_obs[agent_id], dtype=np.float32)
 
     def observe_list(self):
-        observe_list = []
-
+        observe_list = [[] for i in range(self.num_agents)]
         # Crowding distance
         # crowding_distances = list(self.pso.calculate_crowding_distance(self.pso.particles).values())
         # print(crowding_distances)
@@ -184,74 +198,61 @@ class pso_environment_base:
             # distance_best = np.linalg.norm(best_position - particle.position) / self.distance_normalization
             # progress = self.pso.iteration / self.pso_iterations
 
-            distance_good_points = distance_from_cluster(particle.velocity, particle.position, self.good_points) if len(self.good_points) > 0 else 1
-            distance_bad_points = distance_from_cluster(particle.velocity, particle.position, self.bad_points) if len(self.good_points) > 0 else 1
-            distance_good_points = distance_good_points / self.distance_normalization
-            distance_bad_points = distance_bad_points / self.distance_normalization
+            mod_velocity = np.linalg.norm(particle.velocity)
+            distance_good_points, num_good_points = distance_from_cluster(particle.velocity, mod_velocity, particle.previous_position, np.array([p.position for p in self.pso.pareto_front]), self.angle) if len(self.pso.pareto_front) > 0 else (1, 0)
+            distance_bad_points, num_bad_points = distance_from_cluster(particle.velocity, mod_velocity, particle.previous_position, np.array(self.bad_points), self.angle) if len(self.bad_points) > 0 else (1, 0)
+            # distance_bad_points = distance_from_cluster(particle.velocity, particle.position, self.bad_points) if len(self.good_points) > 0 else 1
+            distance_good_points = distance_good_points / mod_velocity
+            distance_bad_points = distance_bad_points / mod_velocity
+            # if np.linalg.norm(particle.velocity) == 0: print("UpSI")
+            # distance_bad_points = distance_bad_points / self.distance_normalization
 
 
             particle_observation = [
                         # mean_distance,
                         distance_good_points,
+                        num_good_points,
                         distance_bad_points,
+                        num_bad_points,
                         # distance_best,
                         particle.iteration_from_best_position,
                         particle.num_skips,
                         # progress
                     ]
-            observe_list.append(particle_observation)
+            observe_list[i] = particle_observation
 
         return observe_list
 
-    # @njit
-    # def distance_from_cluster(self, particle, points):
-    #     v = particle.velocity
-    #     position = np.array(particle.position)
-    #     saved_points = []
-    #     for point in points:
-    #         u = np.array(point) - position
-    #         # print(np.dot(v,u) / (np.linalg.norm(v) * np.linalg.norm(u)))
-    #         # print(v)
-    #         # print(u)
-    #         # print(np.dot(v,u))
-
-    #         angle_rad = math.acos(round(np.dot(v,u) / (np.linalg.norm(v) * np.linalg.norm(u)), 2))
-    #         angle_deg = angle_rad * 180 / np.pi
-    #         if angle_deg < self.theta:
-    #             saved_points.append(np.array(point))
-        
-    #     if len(saved_points) > 1:
-    #         mean_position = np.mean(saved_points, axis = 0)
-    #         return np.linalg.norm(position - mean_position)
-    #     elif len(saved_points) == 1:
-    #         return np.linalg.norm(position - saved_points[0])
-    #     else:
-    #         return 1
 @njit
-def distance_from_cluster(particle_velocity, particle_position, points):
-    v = particle_velocity
-    position = particle_position
+def distance_from_cluster(v, mod_v, pos, points, angle_deg):
+    angle_rad = angle_deg * np.pi / 180
     mask = np.full(len(points), False)
-    for i, point in enumerate(points):
-        u = point - position
-        angle_rad = math.acos(round(np.dot(v,u) / (np.linalg.norm(v) * np.linalg.norm(u)), 2))
-        angle_deg = angle_rad * 180 / np.pi
-        if angle_deg < 20:
-            mask[i] = True
-    
-    if sum(mask) > 1:
-        mean_position = np.zeros(30)
-        for i in range(len(points)):
-            for j in range(len(points[0])):
-                mean_position[j] = mean_position[j] + points[i][j]
-        
-        for j in range(len(mean_position)):
-                mean_position[j] = mean_position[j] / len(points)
+    num_points_inside = 0
+    num_points = len(points)
+    for i in prange(num_points):
+        u = points[i] - pos
+        mod_u = np.linalg.norm(u)
+        if mod_u == 0: continue
 
-        return np.linalg.norm(position - mean_position)
-    elif sum(mask) == 1:
-        for i in range(len(mask)):
-        return np.linalg.norm(position - points[mask])
+        angle = math.acos(np.dot(v, u) / (mod_v * mod_u))
+        if angle < angle_rad:
+            mask[i] = True
+            num_points_inside = num_points_inside + 1
+    
+    if  num_points_inside > 1:
+        # mean_position = [points[i] for i in prange(num_points) if mask[i]][np.random.randint(num_points_inside)]
+        mean_position = np.empty(len(pos))
+        for j in prange(len(points[0])):
+            for i in prange(num_points):
+                mean_position[j] = mean_position[j] + points[i][j]
+            mean_position[j] = mean_position[j] / num_points                     
+        return np.linalg.norm(pos - mean_position), num_points_inside
+    
+    elif num_points_inside == 1:
+        for i in prange(num_points):
+            if mask[i]: 
+                return np.linalg.norm(pos - points[i]), 1
+            
     else:
-        return 1
+        return 1, 0
                

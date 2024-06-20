@@ -74,6 +74,7 @@ class raw_env(AECEnv, EzPickle):
 
     def step(self, action):
         if (self.terminations[self.agent_selection] or self.truncations[self.agent_selection]):
+            # print("Pareto len before reset: ", len(self.env.pso.pareto_front))
             self._was_dead_step(action)
             return
 

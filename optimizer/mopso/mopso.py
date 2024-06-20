@@ -298,7 +298,7 @@ class MOPSO(Optimizer):
                 raise Exception("Mask must be of length num_particles")
             
         optimization_output = self.objective.evaluate(
-            np.array([particle.position for particle in self.particles]), mask)
+            [particle.position for particle in self.particles], mask)
         self.remove_inf(mask)
         improving_evaluations = [particle.set_fitness(optimization_output[p_id])
             for p_id, particle in enumerate(self.particles)]
@@ -330,10 +330,10 @@ class MOPSO(Optimizer):
 
         for _ in range(num_iterations):
             self.step()
-            hv = self.ind(np.array([p.fitness for p in self.pareto_front]))
-            diff = hv - self.prev_hv
-            self.prev_hv = hv
-            self.differences.append(diff)
+            # hv = self.ind(np.array([p.fitness for p in self.pareto_front]))
+            # diff = hv - self.prev_hv
+            # self.prev_hv = hv
+            # self.differences.append(diff)
             pareto_len.append(len(self.pareto_front))
             crowding_distances.append(list(self.calculate_crowding_distance(self.particles).values()))
 
@@ -367,12 +367,12 @@ class MOPSO(Optimizer):
             self.pareto_front = [deepcopy(particles[i]) for i in range(
                 pareto_lenght, len(particles)) if not dominated[i]]
         Logger.debug(f"New pareto front size: {len(self.pareto_front)}")
-        crowding_distances = self.calculate_crowding_distance(
-            self.pareto_front)
-        self.pareto_front.sort(
-            key=lambda x: crowding_distances[x], reverse=True)
+        # crowding_distances = self.calculate_crowding_distance(
+        #     self.pareto_front)
+        # self.pareto_front.sort(
+        #     key=lambda x: crowding_distances[x], reverse=True)
 
-        return dominated
+        return dominated[pareto_lenght:]
 
     def calculate_crowding_distance(self, pareto_front):
         if len(pareto_front) == 0:

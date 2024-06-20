@@ -34,7 +34,8 @@ class ElementWiseObjective(Objective):
 
     def evaluate(self, items, mask = None):
         if mask is None: mask = np.full((len(items)), True, dtype=bool)
-        outputs = [[obj_func(item) for obj_func in self.objective_functions] for item in items[mask]]
+        outputs = [[obj_func(item) for obj_func in self.objective_functions] for item in items]
+        return outputs
         return np.array(self.populate_matrix(outputs, mask))
 
 class BatchObjective(Objective):

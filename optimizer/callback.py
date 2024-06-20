@@ -36,6 +36,7 @@ class CustomCallback(BaseCallback):
         self.keys = self.locals["self"].env.unwrapped.vec_envs[0].par_env.agents
         self.cumulative_episode_reward = {k : [] for k in self.keys}
         self.rewards = {k : [] for k in self.keys}
+        self.num_timesteps
 
     def _on_rollout_start(self) -> None:
         """
@@ -77,9 +78,10 @@ class CustomCallback(BaseCallback):
         This event is triggered before exiting the `learn()` method.
         """
         print("Finished training")
-        plt.figure()
-        plt.plot(self.rewards["particle_0"])
-        plt.savefig("Episodes_rewards.png")
-        plt.close()
+        # plt.figure()
+        # plt.plot(self.rewards["particle_0"])
+        # plt.savefig("Episodes_rewards.png")
+        # plt.close()
         plt.plot(self.cumulative_episode_reward["particle_0"])
         plt.savefig("Cumulative_episodes_rewards.png")
+        plt.close()
