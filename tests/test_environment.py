@@ -78,9 +78,10 @@ def train_butterfly_supersuit(
 
 def main():
     env_kwargs = {'pso' : pso,
-                'num_iterations' : 100,
-                'metric_reward' : 5,
+                'pso_iterations' : 100,
+                'metric_reward' : 10,
                 'evaluation_penalty' : -1,
+                'not_dominated_reward' : 5,
                 'render_mode' : None
                   }
     
@@ -88,7 +89,24 @@ def main():
     env = pso_environment_AEC.parallel_env(**env_kwargs)
     
     # parallel_seed_test(env_fn, num_cycles=10)
-    parallel_api_test(env, num_cycles=100000)
+    print("Test started")
+    parallel_api_test(env, num_cycles=10)
+    env.close()
+
+    env = pso_environment_AEC.env(**env_kwargs)
+    env.reset()
+    for agent in env.agent_iter():
+        obs, reward, termination, truncation, info = env.last()
+        print("Observation ", obs)
+        if termination or truncation:
+            break
+        else:
+            actions = np.random.choice([0,1])
+
+        env.step(actions)
+        print("Iteration ", env.env.pso.iteration)
+    env.close()
+    
 
 if __name__ == "__main__":
     main()

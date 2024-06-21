@@ -48,7 +48,7 @@ class Particle:
         """
         while True:
             leader = Randomizer.rng.choice(pareto_front)
-            if np.all(leader.position != self.position): 
+            if self != leader: 
                 break
         cognitive_random = Randomizer.rng.uniform(0, 1)
         social_random = Randomizer.rng.uniform(0, 1)
@@ -110,5 +110,11 @@ class Particle:
         else:
             self.iteration_from_best_position += 1
         return False
+    
+    def __eq__(self, other): 
+        if not isinstance(other, Particle):
+            return NotImplemented
+        
+        return np.all(self.position == other.position)
 
 

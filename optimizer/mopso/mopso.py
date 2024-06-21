@@ -335,7 +335,7 @@ class MOPSO(Optimizer):
             # self.prev_hv = hv
             # self.differences.append(diff)
             pareto_len.append(len(self.pareto_front))
-            crowding_distances.append(list(self.calculate_crowding_distance(self.particles).values()))
+            # crowding_distances.append(list(self.calculate_crowding_distance(self.particles).values()))
 
         Logger.info("MOPSO optimization finished")
 
@@ -355,7 +355,7 @@ class MOPSO(Optimizer):
     def update_pareto_front(self):
         Logger.debug("Updating Pareto front")
         pareto_lenght = len(self.pareto_front)
-        particles = self.pareto_front + self.particles
+        particles = self.pareto_front + [p for p in self.particles if p not in self.pareto_front]
         particle_fitnesses = np.array(
             [particle.fitness for particle in particles])
         dominated = get_dominated(particle_fitnesses, pareto_lenght)

@@ -1,5 +1,5 @@
 import numpy as np
-from gymnasium.spaces import Discrete, Box
+from gymnasium.spaces import Discrete, Box, Dict
 import copy
 from .metrics import hyper_volume
 from optimizer import Randomizer
@@ -33,21 +33,31 @@ class pso_environment_base:
         self.ind = HV(ref_point=self.ref_point)
         upper_bounds = np.array(self.possible_pso.upper_bounds)
         lower_bounds = np.array(self.possible_pso.lower_bounds)
-        self.distance_normalization = np.linalg.norm(upper_bounds - lower_bounds)
+        self.max_dist = np.linalg.norm(upper_bounds - lower_bounds)
+        print("Max ", self.max_dist)
 
     def get_spaces(self):
         """Define the action and observation spaces for all of the agents."""
 
         len_obs = 6
-        low = np.array([0.] * len_obs)
-        high = np.array([np.inf] * len_obs)
+        # low = np.array([0.] * len_obs)
+        # high = np.array([np.inf] * len_obs)
 
-        obs_space = Box(
-            low = low,
-            high = high,
-            shape=(len_obs, ),
-            dtype=np.float32,
-        )
+        obs_space = Dict({
+            'distance_from_good_points': Box(low = 0, high = np.inf, shape = (1,), dtype=np.float32),
+            'num_good_points': Discrete(self.num_agents * self.pso_iterations),
+            'distance_from_bad_points': Box(low = 0, high = np.inf, shape = (1,), dtype=np.float32),
+            'num_bad_points': Discrete(self.num_agents * self.pso_iterations),
+            'iter_from_best': Discrete(self.pso_iterations),
+            'num_skips': Discrete(self.pso_iterations)
+        })
+
+        # obs_space = Box(
+        #     low = low,
+        #     high = high,
+        #     shape=(len_obs, ),
+        #     dtype=np.float32,
+        # )
 
         act_space = Discrete(2)
 
@@ -169,7 +179,7 @@ class pso_environment_base:
         return self.observe(agent_id)
 
     def observe(self, agent_id):
-        return np.array(self.last_obs[agent_id], dtype=np.float32)
+        return self.last_obs[agent_id] #np.array(self.last_obs[agent_id], dtype=np.float32)
 
     def observe_list(self):
         observe_list = [[] for i in range(self.num_agents)]
@@ -199,8 +209,8 @@ class pso_environment_base:
             # progress = self.pso.iteration / self.pso_iterations
 
             mod_velocity = np.linalg.norm(particle.velocity)
-            distance_good_points, num_good_points = distance_from_cluster(particle.velocity, mod_velocity, particle.previous_position, np.array([p.position for p in self.pso.pareto_front]), self.angle) if len(self.pso.pareto_front) > 0 else (1, 0)
-            distance_bad_points, num_bad_points = distance_from_cluster(particle.velocity, mod_velocity, particle.previous_position, np.array(self.bad_points), self.angle) if len(self.bad_points) > 0 else (1, 0)
+            distance_good_points, num_good_points = distance_from_cluster(particle.velocity, mod_velocity, particle.previous_position, np.array([p.position for p in self.pso.pareto_front]), self.angle, self.max_dist) if len(self.pso.pareto_front) > 0 else (1, 0)
+            distance_bad_points, num_bad_points = distance_from_cluster(particle.velocity, mod_velocity, particle.previous_position, np.array(self.bad_points), self.angle, self.max_dist) if len(self.bad_points) > 0 else (1, 0)
             # distance_bad_points = distance_from_cluster(particle.velocity, particle.position, self.bad_points) if len(self.good_points) > 0 else 1
             distance_good_points = distance_good_points / mod_velocity
             distance_bad_points = distance_bad_points / mod_velocity
@@ -208,23 +218,32 @@ class pso_environment_base:
             # distance_bad_points = distance_bad_points / self.distance_normalization
 
 
-            particle_observation = [
-                        # mean_distance,
-                        distance_good_points,
-                        num_good_points,
-                        distance_bad_points,
-                        num_bad_points,
-                        # distance_best,
-                        particle.iteration_from_best_position,
-                        particle.num_skips,
-                        # progress
-                    ]
+            # particle_observation = [
+            #             # mean_distance,
+            #             distance_good_points,
+            #             num_good_points,
+            #             distance_bad_points,
+            #             num_bad_points,
+            #             # distance_best,
+            #             particle.iteration_from_best_position,
+            #             particle.num_skips,
+            #             # progress
+            #         ]
+            particle_observation = {
+                'distance_from_good_points': distance_good_points,
+                'num_good_points':num_good_points,
+                'distance_from_bad_points': distance_bad_points,
+                'num_bad_points': num_bad_points,
+                'iter_from_best': particle.iteration_from_best_position,
+                'num_skips': particle.num_skips,
+            }
+            
             observe_list[i] = particle_observation
 
         return observe_list
 
 @njit
-def distance_from_cluster(v, mod_v, pos, points, angle_deg):
+def distance_from_cluster(v, mod_v, pos, points, angle_deg, max_dist):
     angle_rad = angle_deg * np.pi / 180
     mask = np.full(len(points), False)
     num_points_inside = 0
@@ -233,8 +252,7 @@ def distance_from_cluster(v, mod_v, pos, points, angle_deg):
         u = points[i] - pos
         mod_u = np.linalg.norm(u)
         if mod_u == 0: continue
-
-        angle = math.acos(np.dot(v, u) / (mod_v * mod_u))
+        angle = math.acos(round(np.dot(v, u) / (mod_v * mod_u), 2))
         if angle < angle_rad:
             mask[i] = True
             num_points_inside = num_points_inside + 1
@@ -254,5 +272,5 @@ def distance_from_cluster(v, mod_v, pos, points, angle_deg):
                 return np.linalg.norm(pos - points[i]), 1
             
     else:
-        return 1, 0
+        return max_dist, 0
                
