@@ -20,7 +20,7 @@ parallel_env = parallel_wrapper_fn(env)
 
 class raw_env(AECEnv, EzPickle):
     metadata = {
-        "render_modes": ["None"],
+        "render_modes": ["None", "human"],
         "name": "pso_environment_v0",
         "is_parallelizable" : True
     }
@@ -97,7 +97,7 @@ class raw_env(AECEnv, EzPickle):
         self.agent_selection = self._agent_selector.next()
         self._accumulate_rewards()
 
-        if self.render_mode == "human":
+        if self.render_mode == "human" and is_last:
             self.render()
 
     def observe(self, agent):

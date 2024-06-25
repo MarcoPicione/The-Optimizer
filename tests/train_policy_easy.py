@@ -49,7 +49,7 @@ def train(env_fn, steps: int = 1e4, seed: int = 0, **env_kwargs):
     env.close()
 
 
-num_agents = 50
+num_agents = 10
 num_iterations = 100
 num_params = 2
 
@@ -109,7 +109,7 @@ def main():
                 'metric_reward' : 100,
                 'evaluation_penalty' : -1,
                 'not_dominated_reward' : 5,
-                'render_mode' : 'human'
+                'render_mode' : 'None'
                     }
 
     train(env_fn, steps=1e8, seed=0, **env_kwargs)

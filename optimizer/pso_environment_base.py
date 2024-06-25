@@ -9,6 +9,7 @@ import math
 from copy import deepcopy
 from numba import njit, jit, prange
 from matplotlib import pyplot as plt
+import matplotlib.patches as patches
 
 class pso_environment_base:
     def __init__(self, pso, pso_iterations, metric_reward, evaluation_penalty, not_dominated_reward, render_mode = None):
@@ -129,7 +130,7 @@ class pso_environment_base:
             # Update pareto, velocities and positions
             dominated = self.pso.update_pareto_front()
             for i in range(self.num_agents):
-                if dominated[i]:
+                if dominated[i] and self.action_list[i]:
                     self.bad_points.append(self.pso.particles[i].position.copy())
             #     else:
             #         self.good_points.append(deepcopy(self.pso.particles[i].position))
@@ -268,9 +269,21 @@ class pso_environment_base:
         return [[action not in self.invalid_actions[i] for i, action in enumerate(self.possible_actions)]]
     
     def render(self):
-        plt.figure()
-        plt.scatter([p.position for p in self.pso.particles], color = 'black')
-        plt.scatter(self.bad_points, color = 'red')
+        fig, ax = plt.subplots(figsize=(10, 10))
+        plt.scatter([p.position[0] for p in self.pso.particles],[p.position[1] for p in self.pso.particles], color = 'black', marker = '.', s = 100)
+        plt.scatter([p[0] for p in self.bad_points], [p[1] for p in self.bad_points], color = 'blue', marker = 'x', s = 50)
+        plt.scatter([p.position[0] for p in self.pso.pareto_front], [p.position[1] for p in self.pso.pareto_front], color = 'green', marker = '*', s = 50)
+        rect = patches.Rectangle((-2, -10), 4, 20, linewidth=1, edgecolor=None, facecolor='green', alpha=0.2)
+        ax.add_patch(rect)
+        for p in self.pso.particles:
+            new_position = p.position + p.velocity
+            c = plt.Circle(new_position, self.max_dist * 0.02, color = 'black', fill = False)
+            plt.plot([p.position[0], new_position[0]], [p.position[1], new_position[1]], '--')
+            ax.add_patch(c)
+        plt.xlim(-10,10)
+        plt.ylim(-10,10)
+        plt.show()
+        plt.close()
         
 
 
