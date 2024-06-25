@@ -355,17 +355,34 @@ class MOPSO(Optimizer):
     def update_pareto_front(self):
         Logger.debug("Updating Pareto front")
         pareto_lenght = len(self.pareto_front)
-        particles = self.pareto_front + [p for p in self.particles if p not in self.pareto_front]
+        # not_appended_particles = np.full(len(self.particles), False)
+        # indexes = []
+        # particles = copy(self.pareto_front)
+        # for i, p in enumerate(self.particles):
+        #     for j in range(len(particles)):
+        #         if p == particles[j]:
+        #             indexes.append(i)
+        #             break
+        #         particles.append(p)
+        #     else:
+        #         not_appended_particles[i] = True
+                
+        particles = self.pareto_front + self.particles #[p for p in self.particles if p not in self.pareto_front]
         particle_fitnesses = np.array(
             [particle.fitness for particle in particles])
         dominated = get_dominated(particle_fitnesses, pareto_lenght)
-
+        
+        # self.pareto_front = []
+        # for i in range(len(particles)):
+        #     if not dominated[i] and particles[i] not in self.pareto_front:
+        #         self.pareto_front.append(deepcopy(particles[i]))
         if self.incremental_pareto:
             self.pareto_front = [deepcopy(particles[i]) for i in range(
                 len(particles)) if not dominated[i]]
         else:
             self.pareto_front = [deepcopy(particles[i]) for i in range(
                 pareto_lenght, len(particles)) if not dominated[i]]
+            
         Logger.debug(f"New pareto front size: {len(self.pareto_front)}")
         # crowding_distances = self.calculate_crowding_distance(
         #     self.pareto_front)

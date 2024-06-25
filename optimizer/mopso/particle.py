@@ -46,10 +46,12 @@ class Particle:
             social_coefficient (float): Social coefficient controlling the impact of global best
                                         (default is 1).
         """
+        counter = 0
         while True:
             leader = Randomizer.rng.choice(pareto_front)
-            if self != leader: 
+            if self != leader or len(pareto_front) == 1 or counter > 100: 
                 break
+            counter += 1
         cognitive_random = Randomizer.rng.uniform(0, 1)
         social_random = Randomizer.rng.uniform(0, 1)
         cognitive = cognitive_coefficient * cognitive_random * \

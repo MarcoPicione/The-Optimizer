@@ -8,6 +8,7 @@ from pymoo.indicators.hv import HV
 import math
 from copy import deepcopy
 from numba import njit, jit, prange
+from matplotlib import pyplot as plt
 
 class pso_environment_base:
     def __init__(self, pso, pso_iterations, metric_reward, evaluation_penalty, not_dominated_reward, render_mode = None):
@@ -44,13 +45,16 @@ class pso_environment_base:
         # high = np.array([np.inf] * len_obs)
 
         obs_space = Dict({
-            'distance_from_good_points': Box(low = 0, high = np.inf, shape = (1,), dtype=np.float32),
-            'num_good_points': Discrete(self.num_agents * self.pso_iterations),
-            'distance_from_bad_points': Box(low = 0, high = np.inf, shape = (1,), dtype=np.float32),
-            'num_bad_points': Discrete(self.num_agents * self.pso_iterations),
+            # 'distance_from_good_points': Box(low = 0, high = np.inf, shape = (1,), dtype=np.float32),
+            # 'num_good_points': Discrete(self.num_agents * self.pso_iterations),
+            # 'distance_from_bad_points': Box(low = 0, high = np.inf, shape = (1,), dtype=np.float32),
+            # 'num_bad_points': Discrete(self.num_agents * self.pso_iterations),
             'iter_from_best': Discrete(self.pso_iterations),
-            'num_skips': Discrete(self.pso_iterations)
+            'points_in_sphere' : Discrete(self.pso_iterations * self.num_agents)
+            # 'num_skips': Discrete(self.pso_iterations)
         })
+
+        
 
         # obs_space = Box(
         #     low = low,
@@ -75,6 +79,7 @@ class pso_environment_base:
         self.action_list = []
         self.good_points = []
         self.bad_points = []
+        self.invalid_actions = [[] for _ in range(self.num_agents)]
 
         # Evaluate all particles to begin with
         self.pso.step()
@@ -161,8 +166,10 @@ class pso_environment_base:
 
                 # print("Rewards: ", positive_reward, " ", negative_reward)
                 # self.last_rewards[id] = self.metric_reward * positive_reward + self.evaluation_penalty * negative_reward
+                
                 self.last_rewards[id] = self.evaluation_penalty * negative_reward
                 self.last_rewards[id] += self.not_dominated_reward if not dominated[id] else 0
+                self.last_rewards[id] += -10000 if len(self.invalid_actions[id]) > 0 else 0
 
                 # print("Reward")
                 # print(self.metric_reward * positive_reward)
@@ -197,7 +204,7 @@ class pso_environment_base:
 
         # volume = volume ** (1 / self.pso.num_params)
 
-        positions = [p.position for p in self.pso.particles]
+        # positions = [p.position for p in self.pso.particles]
         # best_fitnesses = [p.best_fitness for p in self.pso.particles]
         
         for i, particle in enumerate(self.pso.particles):
@@ -208,15 +215,24 @@ class pso_environment_base:
             # distance_best = np.linalg.norm(best_position - particle.position) / self.distance_normalization
             # progress = self.pso.iteration / self.pso_iterations
 
-            mod_velocity = np.linalg.norm(particle.velocity)
-            distance_good_points, num_good_points = distance_from_cluster(particle.velocity, mod_velocity, particle.previous_position, np.array([p.position for p in self.pso.pareto_front]), self.angle, self.max_dist) if len(self.pso.pareto_front) > 0 else (1, 0)
-            distance_bad_points, num_bad_points = distance_from_cluster(particle.velocity, mod_velocity, particle.previous_position, np.array(self.bad_points), self.angle, self.max_dist) if len(self.bad_points) > 0 else (1, 0)
+            # mod_velocity = np.linalg.norm(particle.velocity)
+            # if mod_velocity == 0: mod_velocity = 1
+            # distance_good_points, num_good_points = distance_from_cluster(particle.velocity, mod_velocity, particle.previous_position, np.array([p.position for p in self.pso.pareto_front]), self.angle, self.max_dist) if len(self.pso.pareto_front) > 0 else (1, 0)
+            # distance_bad_points, num_bad_points = distance_from_cluster(particle.velocity, mod_velocity, particle.previous_position, np.array(self.bad_points), self.angle, self.max_dist) if len(self.bad_points) > 0 else (1, 0)
             # distance_bad_points = distance_from_cluster(particle.velocity, particle.position, self.bad_points) if len(self.good_points) > 0 else 1
-            distance_good_points = distance_good_points / mod_velocity
-            distance_bad_points = distance_bad_points / mod_velocity
+            # if distance_good_points > 1e8:
+            #         print("SHIT")
+            
+            # distance_good_points = distance_good_points / mod_velocity
+            # distance_bad_points = distance_bad_points / mod_velocity
             # if np.linalg.norm(particle.velocity) == 0: print("UpSI")
             # distance_bad_points = distance_bad_points / self.distance_normalization
 
+            points_in_sphere = sphere(particle.position, particle.velocity, 0.1 * self.max_dist, np.array(self.bad_points)) if len(self.bad_points) > 0 else 0
+            if points_in_sphere == 0:
+                self.invalid_actions[i] = [0]
+            else:
+                self.invalid_actions[i] = []
 
             # particle_observation = [
             #             # mean_distance,
@@ -230,17 +246,33 @@ class pso_environment_base:
             #             # progress
             #         ]
             particle_observation = {
-                'distance_from_good_points': distance_good_points,
-                'num_good_points':num_good_points,
-                'distance_from_bad_points': distance_bad_points,
-                'num_bad_points': num_bad_points,
+                # 'distance_from_good_points': (distance_good_points, ),
+                # 'num_good_points':num_good_points,
+                # 'distance_from_bad_points': (distance_bad_points, ),
+                # 'num_bad_points': num_bad_points,
+                'points_in_sphere' : points_in_sphere,
                 'iter_from_best': particle.iteration_from_best_position,
-                'num_skips': particle.num_skips,
+                # 'num_skips': particle.num_skips,
             }
+
+            # if distance_good_points > 1e8:
+            #         print("SHIT")
+            # if distance_bad_points > 1e8:
+            #         print("SHIT")
             
             observe_list[i] = particle_observation
 
         return observe_list
+    
+    def action_masks(self):
+        return [[action not in self.invalid_actions[i] for i, action in enumerate(self.possible_actions)]]
+    
+    def render(self):
+        plt.figure()
+        plt.scatter([p.position for p in self.pso.particles], color = 'black')
+        plt.scatter(self.bad_points, color = 'red')
+        
+
 
 @njit
 def distance_from_cluster(v, mod_v, pos, points, angle_deg, max_dist):
@@ -251,8 +283,10 @@ def distance_from_cluster(v, mod_v, pos, points, angle_deg, max_dist):
     for i in prange(num_points):
         u = points[i] - pos
         mod_u = np.linalg.norm(u)
-        if mod_u == 0: continue
-        angle = math.acos(round(np.dot(v, u) / (mod_v * mod_u), 2))
+        if mod_u != 0: # if the point is in the pareto is also inside the cone
+            angle = math.acos(round(np.dot(v, u) / (mod_v * mod_u), 2))
+        else:
+            angle = 0
         if angle < angle_rad:
             mask[i] = True
             num_points_inside = num_points_inside + 1
@@ -273,4 +307,17 @@ def distance_from_cluster(v, mod_v, pos, points, angle_deg, max_dist):
             
     else:
         return max_dist, 0
+    
+@njit
+def sphere(position, velocity, radius, points):
+    new_position = position + velocity
+    mask = np.full(len(points), False)
+    for i, p in enumerate(points): 
+        if np.linalg.norm(new_position - p) < radius:
+            mask[i] = True
+    return np.sum(mask)
+
+
+
+    
                

@@ -70,7 +70,7 @@ class raw_env(AECEnv, EzPickle):
         pass
 
     def render(self):
-        pass
+        self.env.render()
 
     def step(self, action):
         if (self.terminations[self.agent_selection] or self.truncations[self.agent_selection]):
@@ -108,4 +108,7 @@ class raw_env(AECEnv, EzPickle):
     
     def action_space(self, agent):
         return self.action_spaces[agent]
+    
+    def action_masks(self) :
+        return self.env.action_masks()
     
