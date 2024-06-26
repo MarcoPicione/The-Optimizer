@@ -44,6 +44,10 @@ class CustomCallback(BaseCallback):
         using the current policy.
         This event is triggered before collecting new samples.
         """
+
+        # print("REWARDS:")
+        # print(self.rewards)
+        # input()
         pass
 
     def _on_step(self) -> bool:
@@ -71,6 +75,8 @@ class CustomCallback(BaseCallback):
         """
         This event is triggered before updating the policy.
         """
+        # print("REWARDS ")
+        # print(self.keys = self.locals["self"].env.unwrapped.vec_envs[0].)
         pass
 
     def _on_training_end(self) -> None:

@@ -90,22 +90,35 @@ def main():
     
     # parallel_seed_test(env_fn, num_cycles=10)
     print("Test started")
-    parallel_api_test(env, num_cycles=10)
+    # parallel_api_test(env, num_cycles=10)
     env.close()
 
-    env = pso_environment_AEC.env(**env_kwargs)
+    print("TESTING")
+    env = pso_environment_AEC.parallel_env(**env_kwargs)
     env.reset()
-    for agent in env.agent_iter():
-        obs, reward, termination, truncation, info = env.last()
-        print("Observation ", obs)
-        if termination or truncation:
-            break
-        else:
-            actions = np.random.choice([0,1])
 
-        env.step(actions)
-        print("Iteration ", env.env.pso.iteration)
+    while env.agents:
+        # this is where you would insert your policy
+        actions = {agent: env.action_space(agent).sample() for agent in env.agents}
+
+        observations, rewards, terminations, truncations, infos = env.step(actions)
+        print("Iteration ", env.aec_env.env.pso.iteration)
+        print(rewards)
+        input()
     env.close()
+
+
+    # for agent in env.agent_iter():
+    #     obs, reward, termination, truncation, info = env.last()
+    #     print("Observation ", obs)
+    #     if termination or truncation:
+    #         break
+    #     else:
+    #         actions = np.random.choice([0,1])
+
+    #     env.step(actions)
+    #     print("Iteration ", env.env.pso.iteration)
+    # env.close()
     
 
 if __name__ == "__main__":

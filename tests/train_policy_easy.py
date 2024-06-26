@@ -25,11 +25,11 @@ def train(env_fn, steps: int = 1e4, seed: int = 0, **env_kwargs):
     print("Observation Space:", env.observation_space)
     print("Action Space:", env.action_space)
 
-    policy_kwargs = dict(activation_fn=th.nn.ReLU,
-                     net_arch=dict(pi=[32, 32], vf=[32, 32]))
+    policy_kwargs = dict(activation_fn=th.nn.Tanh,
+                     net_arch=dict(pi=[5, 5], vf=[5, 5]))
     
     model = PPO(
-        MultiInputPolicy,
+        MlpPolicy,
         env,
         verbose=2,
         learning_rate=1e-6,
@@ -37,7 +37,7 @@ def train(env_fn, steps: int = 1e4, seed: int = 0, **env_kwargs):
         batch_size=100,
         n_epochs = 10,
         vf_coef=0.1,
-        # policy_kwargs=policy_kwargs
+        policy_kwargs=policy_kwargs
     )
 
     # print("MODEL:")
@@ -49,7 +49,7 @@ def train(env_fn, steps: int = 1e4, seed: int = 0, **env_kwargs):
     env.close()
 
 
-num_agents = 50
+num_agents = 1
 num_iterations = 100
 num_params = 2
 
@@ -105,11 +105,11 @@ def main():
 
     env_fn = pso_environment_AEC
     env_kwargs = {'pso' : pso,
-                'pso_iterations' : 100,
+                'pso_iterations' : 3,
                 'metric_reward' : 10,
                 'evaluation_penalty' : -1,
                 'not_dominated_reward' : 10,
-                'render_mode' : 'None'
+                'render_mode' : 'human'
                     }
 
     train(env_fn, steps=2e6, seed=0, **env_kwargs)

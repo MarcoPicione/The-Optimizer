@@ -83,8 +83,8 @@ class raw_env(AECEnv, EzPickle):
         self.env.step(action, self.agent_name_mapping[agent], is_last)
 
         if is_last:
-            for i in self.rewards:
-                self.rewards[i] = self.env.rewards[self.agent_name_mapping[i]]
+            for k in self.rewards.keys():
+                self.rewards[k] += self.env.last_rewards[self.agent_name_mapping[k]]
 
             self.truncations = dict(zip(self.agents, [False for _ in self.agents]))
             if self.env.pso.iteration == self.pso_iterations:

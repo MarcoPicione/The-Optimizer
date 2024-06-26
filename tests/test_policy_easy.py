@@ -16,8 +16,8 @@ num_agents = 50
 num_iterations = 100
 num_params = 2
 
-lb = [0.] * num_params
-ub = [1.] * num_params
+lb = [-10.] * num_params
+ub = [10.] * num_params
 
 optimizer.Logger.setLevel('INFO')
 
@@ -50,7 +50,7 @@ env_kwargs = {'pso' : pso,
                 'metric_reward' : 10,
                 'evaluation_penalty' : -1,
                 'not_dominated_reward' : 10,
-                'render_mode' : 'human'
+                'render_mode' : 'None'
                     }
 env = pso_environment_AEC.env(**env_kwargs)
 
@@ -60,33 +60,35 @@ print(f"Starting training on {str(env.metadata['name'])}.")
 # env = ss.concat_vec_envs_v1(env, 1, num_cpus=2, base_class="stable_baselines3")
 model = PPO.load("model")
 
-rewards = {"particle_" + str(i) for i in range(num_agents)}
+rewards = {agent: 0 for agent in env.possible_agents}
 env.reset()
 num_actions = num_agents
 for agent in env.agent_iter():
-            obs, reward, termination, truncation, info = env.last()
-            # print("Observation ", obs)
+    obs, reward, termination, truncation, info = env.last()
+    # print("Observation ", obs)
 
-            # for a in env.agents:
-            #     rewards[agent] += env.rewards[agent]
-            if termination or truncation:
-                plt.figure()
-                fitnesses = np.array([p.fitness for p in env.env.pso.pareto_front])
-                plt.scatter(fitnesses[:,0],fitnesses[:,1], s=5)
-                n_pareto_points = len(env.env.pso.pareto_front)
-                # real_x = (np.linspace(-2, 2, n_pareto_points))
-                # real_y = 1-np.sqrt(real_x)
-                # plt.scatter(real_x, real_y, s=5, c='red')
-                plt.savefig("paretoRL.png")
-                break
-            else:
-                actions = model.predict(obs, deterministic=True)[0]
-                print(actions)
-                num_actions += np.sum(actions)
-                # print("Action ", act)
+    for a in env.agents:
+        rewards[a] += env.rewards[a]
+    print(env.rewards)
+    input()
+    if termination or truncation:
+        plt.figure()
+        fitnesses = np.array([p.fitness for p in env.env.pso.pareto_front])
+        plt.scatter(fitnesses[:,0],fitnesses[:,1], s=5)
+        n_pareto_points = len(env.env.pso.pareto_front)
+        # real_x = (np.linspace(-2, 2, n_pareto_points))
+        # real_y = 1-np.sqrt(real_x)
+        # plt.scatter(real_x, real_y, s=5, c='red')
+        plt.savefig("paretoRL.png")
+        break
+    else:
+        actions = model.predict(obs, deterministic=True)[0]
+        print(actions)
+        num_actions += np.sum(actions)
+        # print("Action ", act)
 
-            env.step(actions)
-            print("Iteration ", env.env.pso.iteration)
+    env.step(actions)
+    print("Iteration ", env.env.pso.iteration)
 print("Tot evaluations: ", num_actions)
 print("Fraction evaluations: ", num_actions / (num_agents * num_iterations))
 env.close()

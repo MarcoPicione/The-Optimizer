@@ -45,15 +45,17 @@ class pso_environment_base:
         # low = np.array([0.] * len_obs)
         # high = np.array([np.inf] * len_obs)
 
-        obs_space = Dict({
-            # 'distance_from_good_points': Box(low = 0, high = np.inf, shape = (1,), dtype=np.float32),
-            # 'num_good_points': Discrete(self.num_agents * self.pso_iterations),
-            # 'distance_from_bad_points': Box(low = 0, high = np.inf, shape = (1,), dtype=np.float32),
-            # 'num_bad_points': Discrete(self.num_agents * self.pso_iterations),
-            # 'iter_from_best': Discrete(self.pso_iterations),
-            'points_in_sphere' : Discrete(self.pso_iterations * self.num_agents)
-            # 'num_skips': Discrete(self.pso_iterations)
-        })
+        # obs_space = Dict({
+        #     # 'distance_from_good_points': Box(low = 0, high = np.inf, shape = (1,), dtype=np.float32),
+        #     # 'num_good_points': Discrete(self.num_agents * self.pso_iterations),
+        #     # 'distance_from_bad_points': Box(low = 0, high = np.inf, shape = (1,), dtype=np.float32),
+        #     # 'num_bad_points': Discrete(self.num_agents * self.pso_iterations),
+        #     # 'iter_from_best': Discrete(self.pso_iterations),
+        #     'points_in_sphere' : Discrete(self.pso_iterations * self.num_agents)
+        #     # 'num_skips': Discrete(self.pso_iterations)
+        # })
+
+        obs_space = Box(low = 0, high = self.num_agents * self.pso_iterations, shape = (2,), dtype=np.float32)
 
         
 
@@ -102,7 +104,7 @@ class pso_environment_base:
         # print(self.prev_hv)      
         # obs_list = self.build_state()
 
-        self.rewards = [0 for a in range(self.num_agents)]
+        # self.rewards = [0 for a in range(self.num_agents)]
 
         # self.terminations = {a: False for a in self.agents}
         # self.truncations = {a: False for a in self.agents}
@@ -126,15 +128,23 @@ class pso_environment_base:
         optimization_output = self.pso.objective.evaluate(np.array([p.position]))[0] if action else [np.inf] * len(p.fitness)
         improving_evaluations = p.set_fitness(optimization_output)
 
+        # Negative reward if evaluated
+        self.last_rewards[agent_id] = self.evaluation_penalty * action
+        # Negative reward
+        # if len(self.invalid_actions[agent_id]) > 0 and not action:
+        #     self.last_rewards[agent_id] += -10000 
+
         if is_last:
-            # Update pareto, velocities and positions
+            # Update pareto
             dominated = self.pso.update_pareto_front()
-            for i in range(self.num_agents):
-                if dominated[i] and self.action_list[i]:
-                    self.bad_points.append(self.pso.particles[i].position.copy())
+            # If a particle is dominated and was evaluated add it to bad points list.
+            for id in range(self.num_agents):
+                if dominated[id] and self.action_list[id]:
+                    self.bad_points.append(self.pso.particles[id].position.copy())
             #     else:
             #         self.good_points.append(deepcopy(self.pso.particles[i].position))
 
+            # Update velocities and positions
             for particle in self.pso.particles:
                 particle.update_velocity(self.pso.pareto_front,
                                             self.pso.inertia_weight,
@@ -142,52 +152,34 @@ class pso_environment_base:
                                             self.pso.social_coefficient)
                 particle.update_position(self.pso.lower_bounds, self.pso.upper_bounds)
             
-            # Other stuff
-            obs_list = self.observe_list()
-            self.last_obs = obs_list
-
-            # if self.pso.iteration == self.pso_iterations:
-            # print("Mopso iteration ", self.pso.iteration)
-            # print("Pareto dim ", len(self.pso.pareto_front))
+            # Assign rewards
             
-            # start = time.time()
-            hv = self.ind(np.array([p.fitness for p in self.pso.pareto_front]))#hyper_volume([p.fitness for p in self.pso.pareto_front], self.ref_point)
-            diff_hv = hv - self.prev_hv
-            self.prev_hv = hv
-            # print(hv)
+            # hv = self.ind(np.array([p.fitness for p in self.pso.pareto_front]))
+            # diff_hv = hv - self.prev_hv
+            # self.prev_hv = hv
 
-            # end = time.time()
-            # print(end - start)
             for id in range(self.num_agents):
                 p = self.pso.particles[id]
-                # print(self.metric_reward * hv)
-                # print(self.evaluation_penalty * sum(self.action_list))
-                positive_reward = diff_hv
-                negative_reward = self.action_list[id]
+                # positive_reward = diff_hv
 
-                # print("Rewards: ", positive_reward, " ", negative_reward)
-                # self.last_rewards[id] = self.metric_reward * positive_reward + self.evaluation_penalty * negative_reward
-                
-                self.last_rewards[id] = self.evaluation_penalty * negative_reward
+                # self.last_rewards[id] += self.metric_reward * positive_reward
                 self.last_rewards[id] += self.not_dominated_reward if not dominated[id] else 0
-                self.last_rewards[id] += -10000 if (len(self.invalid_actions[id]) > 0 and not self.action_list[id]) else 0
 
-                # print("Reward")
-                # print(self.metric_reward * positive_reward)
-                # print(self.evaluation_penalty * negative_reward)
-                # print(self.not_dominated_reward if not dominated[id] else 0)
 
-                self.rewards[id] = self.last_rewards[id]
+                # print(self.last_rewards[id])
+                # self.rewards[id] = self.last_rewards[id]
 
             self.pso.iteration += 1
             self.action_list = []
 
-            # rewards = np.array(self.rewards)
+            # Generate new observations
+            obs_list = self.observe_list()
+            self.last_obs = obs_list
 
         return self.observe(agent_id)
 
     def observe(self, agent_id):
-        return self.last_obs[agent_id] #np.array(self.last_obs[agent_id], dtype=np.float32)
+        return np.array(self.last_obs[agent_id], dtype=np.float32) #self.last_obs[agent_id] 
 
     def observe_list(self):
         observe_list = [[] for i in range(self.num_agents)]
@@ -235,26 +227,28 @@ class pso_environment_base:
             else:
                 self.invalid_actions[i] = []
 
-            # particle_observation = [
-            #             # mean_distance,
-            #             distance_good_points,
-            #             num_good_points,
-            #             distance_bad_points,
-            #             num_bad_points,
-            #             # distance_best,
-            #             particle.iteration_from_best_position,
-            #             particle.num_skips,
-            #             # progress
-            #         ]
-            particle_observation = {
-                # 'distance_from_good_points': (distance_good_points, ),
-                # 'num_good_points':num_good_points,
-                # 'distance_from_bad_points': (distance_bad_points, ),
-                # 'num_bad_points': num_bad_points,
-                'points_in_sphere' : points_in_sphere,
-                # 'iter_from_best': particle.iteration_from_best_position,
-                # 'num_skips': particle.num_skips,
-            }
+            particle_observation = [
+                        points_in_sphere,
+                        particle.iteration_from_best_position,
+                        # # mean_distance,
+                        # distance_good_points,
+                        # num_good_points,
+                        # distance_bad_points,
+                        # num_bad_points,
+                        # # distance_best,
+                        # particle.iteration_from_best_position,
+                        # particle.num_skips,
+                        # # progress
+                    ]
+            # particle_observation = {
+            #     # 'distance_from_good_points': (distance_good_points, ),
+            #     # 'num_good_points':num_good_points,
+            #     # 'distance_from_bad_points': (distance_bad_points, ),
+            #     # 'num_bad_points': num_bad_points,
+            #     'points_in_sphere' : points_in_sphere,
+            #     # 'iter_from_best': particle.iteration_from_best_position,
+            #     # 'num_skips': particle.num_skips,
+            # }
 
             # if distance_good_points > 1e8:
             #         print("SHIT")
