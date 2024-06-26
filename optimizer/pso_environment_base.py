@@ -50,7 +50,7 @@ class pso_environment_base:
             # 'num_good_points': Discrete(self.num_agents * self.pso_iterations),
             # 'distance_from_bad_points': Box(low = 0, high = np.inf, shape = (1,), dtype=np.float32),
             # 'num_bad_points': Discrete(self.num_agents * self.pso_iterations),
-            'iter_from_best': Discrete(self.pso_iterations),
+            # 'iter_from_best': Discrete(self.pso_iterations),
             'points_in_sphere' : Discrete(self.pso_iterations * self.num_agents)
             # 'num_skips': Discrete(self.pso_iterations)
         })
@@ -170,7 +170,7 @@ class pso_environment_base:
                 
                 self.last_rewards[id] = self.evaluation_penalty * negative_reward
                 self.last_rewards[id] += self.not_dominated_reward if not dominated[id] else 0
-                self.last_rewards[id] += -10000 if len(self.invalid_actions[id]) > 0 else 0
+                self.last_rewards[id] += -10000 if (len(self.invalid_actions[id]) > 0 and not self.action_list[id]) else 0
 
                 # print("Reward")
                 # print(self.metric_reward * positive_reward)
@@ -252,7 +252,7 @@ class pso_environment_base:
                 # 'distance_from_bad_points': (distance_bad_points, ),
                 # 'num_bad_points': num_bad_points,
                 'points_in_sphere' : points_in_sphere,
-                'iter_from_best': particle.iteration_from_best_position,
+                # 'iter_from_best': particle.iteration_from_best_position,
                 # 'num_skips': particle.num_skips,
             }
 

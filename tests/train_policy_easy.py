@@ -32,11 +32,11 @@ def train(env_fn, steps: int = 1e4, seed: int = 0, **env_kwargs):
         MultiInputPolicy,
         env,
         verbose=2,
-        learning_rate=1e-2,
-        n_steps=512,
-        batch_size=512,
-        n_epochs = 100,
-        vf_coef=0.01,
+        learning_rate=1e-6,
+        n_steps=10,
+        batch_size=100,
+        n_epochs = 10,
+        vf_coef=0.1,
         # policy_kwargs=policy_kwargs
     )
 
@@ -49,7 +49,7 @@ def train(env_fn, steps: int = 1e4, seed: int = 0, **env_kwargs):
     env.close()
 
 
-num_agents = 10
+num_agents = 50
 num_iterations = 100
 num_params = 2
 
@@ -100,19 +100,19 @@ def main():
     print("NEXT STEP")
     pso = optimizer.MOPSO(objective=objective, lower_bounds=lb, upper_bounds=ub,
                         num_particles=num_agents,
-                        inertia_weight=0.6, cognitive_coefficient=1, social_coefficient=2, initial_particles_position='random', incremental_pareto=True, 
+                        inertia_weight=0.6, cognitive_coefficient=0.5, social_coefficient=1, initial_particles_position='random', incremental_pareto=True, 
                         use_reinforcement_learning=use_reinforcement_learning)
 
     env_fn = pso_environment_AEC
     env_kwargs = {'pso' : pso,
                 'pso_iterations' : 100,
-                'metric_reward' : 100,
+                'metric_reward' : 10,
                 'evaluation_penalty' : -1,
-                'not_dominated_reward' : 5,
+                'not_dominated_reward' : 10,
                 'render_mode' : 'None'
                     }
 
-    train(env_fn, steps=1e8, seed=0, **env_kwargs)
+    train(env_fn, steps=2e6, seed=0, **env_kwargs)
 
     # print("TEST")
     # env = pso_environment_AEC.env(**env_kwargs)

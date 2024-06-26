@@ -47,11 +47,11 @@ pso = optimizer.MOPSO(objective=objective, lower_bounds=lb, upper_bounds=ub,
 
 env_kwargs = {'pso' : pso,
                 'pso_iterations' : 100,
-                'metric_reward' : 100,
+                'metric_reward' : 10,
                 'evaluation_penalty' : -1,
-                'not_dominated_reward' : 5,
-                'render_mode' : None
-                  }
+                'not_dominated_reward' : 10,
+                'render_mode' : 'human'
+                    }
 env = pso_environment_AEC.env(**env_kwargs)
 
 print(f"Starting training on {str(env.metadata['name'])}.")
@@ -74,9 +74,9 @@ for agent in env.agent_iter():
                 fitnesses = np.array([p.fitness for p in env.env.pso.pareto_front])
                 plt.scatter(fitnesses[:,0],fitnesses[:,1], s=5)
                 n_pareto_points = len(env.env.pso.pareto_front)
-                real_x = (np.linspace(0, 1, n_pareto_points))
-                real_y = 1-np.sqrt(real_x)
-                plt.scatter(real_x, real_y, s=5, c='red')
+                # real_x = (np.linspace(-2, 2, n_pareto_points))
+                # real_y = 1-np.sqrt(real_x)
+                # plt.scatter(real_x, real_y, s=5, c='red')
                 plt.savefig("paretoRL.png")
                 break
             else:
@@ -88,4 +88,5 @@ for agent in env.agent_iter():
             env.step(actions)
             print("Iteration ", env.env.pso.iteration)
 print("Tot evaluations: ", num_actions)
+print("Fraction evaluations: ", num_actions / (num_agents * num_iterations))
 env.close()
