@@ -83,6 +83,7 @@ class raw_env(AECEnv, EzPickle):
         self.env.step(action, self.agent_name_mapping[agent], is_last)
 
         if is_last:
+            # print("LAST")
             for k in self.rewards.keys():
                 self.rewards[k] += self.env.last_rewards[self.agent_name_mapping[k]]
 

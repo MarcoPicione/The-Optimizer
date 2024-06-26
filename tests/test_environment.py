@@ -9,7 +9,7 @@ import time
 from pettingzoo.test import parallel_api_test, parallel_seed_test
 
 
-num_agents = 50
+num_agents = 2
 num_iterations = 100
 num_params = 30
 
@@ -44,44 +44,12 @@ pso = optimizer.MOPSO(objective=objective, lower_bounds=lb, upper_bounds=ub,
                       inertia_weight=0.6, cognitive_coefficient=1, social_coefficient=2, initial_particles_position='random', incremental_pareto=True, 
                       use_reinforcement_learning=use_reinforcement_learning)
 
-def train_butterfly_supersuit(
-    env_fn, steps: int = 10_000, seed: int = 0, **env_kwargs
-):
-    # Train a single model to play as each agent in a cooperative Parallel environment
-    env = env_fn.parallel_env(**env_kwargs)
-
-    env.reset(seed=seed)
-
-    print(f"Starting training on {str(env.metadata['name'])}.")
-
-    env = ss.pettingzoo_env_to_vec_env_v1(env)
-    env = ss.concat_vec_envs_v1(env, 1, num_cpus=2, base_class="stable_baselines3")
-
-    # Note: Waterworld's observation space is discrete (242,) so we use an MLP policy rather than CNN
-    model = PPO(
-        MlpPolicy,
-        env,
-        verbose=3,
-        learning_rate=1e-3,
-        batch_size=256,
-    )
-
-    model.learn(total_timesteps=steps)
-
-    model.save(f"{env.unwrapped.metadata.get('name')}_{time.strftime('%Y%m%d-%H%M%S')}")
-
-    print("Model has been saved.")
-
-    print(f"Finished training on {str(env.unwrapped.metadata['name'])}.")
-
-    env.close()
-
 def main():
     env_kwargs = {'pso' : pso,
-                'pso_iterations' : 100,
+                'pso_iterations' : 10,
                 'metric_reward' : 10,
                 'evaluation_penalty' : -1,
-                'not_dominated_reward' : 5,
+                'not_dominated_reward' : 10,
                 'render_mode' : None
                   }
     
@@ -104,6 +72,7 @@ def main():
         observations, rewards, terminations, truncations, infos = env.step(actions)
         print("Iteration ", env.aec_env.env.pso.iteration)
         print(rewards)
+        print(terminations)
         input()
     env.close()
 
