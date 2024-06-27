@@ -110,7 +110,7 @@ def main():
                 'metric_reward' : 10,
                 'evaluation_penalty' : -1,
                 'not_dominated_reward' : 0,
-                'render_mode' : 'human'
+                'render_mode' : 'None'
                     }
 
     train(env_fn, steps=2e6, seed=0, **env_kwargs)

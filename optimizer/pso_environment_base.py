@@ -37,7 +37,7 @@ class pso_environment_base:
         upper_bounds = np.array(self.possible_pso.upper_bounds)
         lower_bounds = np.array(self.possible_pso.lower_bounds)
         self.max_dist = np.linalg.norm(upper_bounds - lower_bounds)
-        self.radius = 0.05 * self.max_dist
+        self.radius = 0.03 * self.max_dist
         print("Max ", self.max_dist)
 
     def get_spaces(self):
@@ -134,8 +134,8 @@ class pso_environment_base:
         # Negative reward if evaluated
         self.last_rewards[agent_id] = self.evaluation_penalty * action
         # Negative reward
-        # if len(self.invalid_actions[agent_id]) > 0 and not action:
-        #     self.last_rewards[agent_id] += -10000 
+        if len(self.invalid_actions[agent_id]) > 0 and not action:
+            self.last_rewards[agent_id] += -10000 
 
         if is_last:
             # Update pareto
