@@ -10,6 +10,7 @@ from copy import deepcopy
 from numba import njit, jit, prange
 from matplotlib import pyplot as plt
 import matplotlib.patches as patches
+import optimizer
 
 class pso_environment_base:
     def __init__(self, pso, pso_iterations, metric_reward, evaluation_penalty, not_dominated_reward, render_mode = None):
@@ -77,6 +78,7 @@ class pso_environment_base:
         # return [seed]
 
     def reset(self):
+        optimizer.Randomizer.rng = np.random.default_rng(43)
         self.pso = copy.deepcopy(self.possible_pso)
         self.timestep = 0
         self.action_list = []
@@ -221,7 +223,7 @@ class pso_environment_base:
             # if np.linalg.norm(particle.velocity) == 0: print("UpSI")
             # distance_bad_points = distance_bad_points / self.distance_normalization
 
-            points_in_sphere = sphere(particle.position, particle.velocity, 0.1 * self.max_dist, np.array(self.bad_points)) if len(self.bad_points) > 0 else 0
+            points_in_sphere = sphere(particle.position, 0.05 * self.max_dist, np.array(self.bad_points)) if len(self.bad_points) > 0 else 0
             if points_in_sphere == 0:
                 self.invalid_actions[i] = [0]
             else:
@@ -316,11 +318,10 @@ def distance_from_cluster(v, mod_v, pos, points, angle_deg, max_dist):
         return max_dist, 0
     
 @njit
-def sphere(position, velocity, radius, points):
-    new_position = position + velocity
+def sphere(position, radius, points):
     mask = np.full(len(points), False)
     for i, p in enumerate(points): 
-        if np.linalg.norm(new_position - p) < radius:
+        if np.linalg.norm(position - p) < radius:
             mask[i] = True
     return np.sum(mask)
 

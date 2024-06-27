@@ -20,7 +20,7 @@ def train(env_fn, steps: int = 1e4, seed: int = 0, **env_kwargs):
     env.reset(seed=seed)
     print(f"Starting training on {str(env.metadata['name'])}.")
     env = ss.pettingzoo_env_to_vec_env_v1(env)
-    env = ss.concat_vec_envs_v1(env, num_vec_envs = 1, num_cpus=1, base_class="stable_baselines3")
+    env = ss.concat_vec_envs_v1(env, num_vec_envs = 4, num_cpus=1, base_class="stable_baselines3")
     env = VecMonitor(env)
     print("Observation Space:", env.observation_space)
     print("Action Space:", env.action_space)
@@ -32,12 +32,15 @@ def train(env_fn, steps: int = 1e4, seed: int = 0, **env_kwargs):
         MlpPolicy,
         env,
         verbose=2,
-        learning_rate=1e-6,
-        n_steps= int(num_agents * 0.2 * env_kwargs['pso_iterations']),
+        learning_rate=1e-4,
+        gamma = 1,
+        n_steps= int(0.2 * env_kwargs['pso_iterations']),
         batch_size=100,
-        n_epochs = 10,
-        vf_coef=0.1,
-        policy_kwargs=policy_kwargs
+        n_epochs = 20,
+        # vf_coef=0.1,
+        # ent_coef = 0.1,
+        # max_grad_norm=0.01,
+        # policy_kwargs=policy_kwargs
     )
 
     # print("MODEL:")
@@ -49,7 +52,7 @@ def train(env_fn, steps: int = 1e4, seed: int = 0, **env_kwargs):
     env.close()
 
 
-num_agents = 50
+num_agents = 5
 num_iterations = 100
 num_params = 2
 
@@ -65,8 +68,6 @@ def objective2(x):
     return (x[0] - 2) ** 2 + 20
 
 use_reinforcement_learning = 0
-
-optimizer.Randomizer.rng = np.random.default_rng(43)
 
 optimizer.FileManager.working_dir = "tmp/easy_problem/"
 optimizer.FileManager.loading_enabled = False
