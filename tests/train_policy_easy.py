@@ -109,7 +109,7 @@ def main():
                 'pso_iterations' : num_iterations,
                 'metric_reward' : 10,
                 'evaluation_penalty' : -1,
-                'not_dominated_reward' : 5,
+                'not_dominated_reward' : 0,
                 'render_mode' : 'human'
                     }
 
