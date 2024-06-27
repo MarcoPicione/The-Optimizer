@@ -165,7 +165,7 @@ class pso_environment_base:
                 # positive_reward = diff_hv
 
                 # self.last_rewards[id] += self.metric_reward * positive_reward
-                self.last_rewards[id] += self.not_dominated_reward if not dominated[id] else 0
+                self.last_rewards[id] -= self.not_dominated_reward if dominated[id] else 0
 
 
                 # print(self.last_rewards[id])
@@ -223,7 +223,7 @@ class pso_environment_base:
             # if np.linalg.norm(particle.velocity) == 0: print("UpSI")
             # distance_bad_points = distance_bad_points / self.distance_normalization
 
-            points_in_sphere = sphere(particle.position, 0.05 * self.max_dist, np.array(self.bad_points)) if len(self.bad_points) > 0 else 0
+            points_in_sphere = sphere(particle.position, 0.1 * self.max_dist, np.array(self.bad_points)) if len(self.bad_points) > 0 else 0
             if points_in_sphere == 0:
                 self.invalid_actions[i] = [0]
             else:
@@ -272,9 +272,8 @@ class pso_environment_base:
         rect = patches.Rectangle((-2, -10), 4, 20, linewidth=1, edgecolor=None, facecolor='green', alpha=0.2)
         ax.add_patch(rect)
         for p in self.pso.particles:
-            new_position = p.position + p.velocity
-            c = plt.Circle(new_position, self.max_dist * 0.02, color = 'black', fill = False)
-            plt.plot([p.position[0], new_position[0]], [p.position[1], new_position[1]], '--')
+            c = plt.Circle(p.position, self.max_dist * 0.02, color = 'black', fill = False)
+            # plt.plot([p.position[0], new_position[0]], [p.position[1], new_position[1]], '--')
             ax.add_patch(c)
         plt.xlim(-10,10)
         plt.ylim(-10,10)

@@ -20,7 +20,7 @@ def train(env_fn, steps: int = 1e4, seed: int = 0, **env_kwargs):
     env.reset(seed=seed)
     print(f"Starting training on {str(env.metadata['name'])}.")
     env = ss.pettingzoo_env_to_vec_env_v1(env)
-    env = ss.concat_vec_envs_v1(env, num_vec_envs = 4, num_cpus=1, base_class="stable_baselines3")
+    env = ss.concat_vec_envs_v1(env, num_vec_envs = 1, num_cpus=1, base_class="stable_baselines3")
     env = VecMonitor(env)
     print("Observation Space:", env.observation_space)
     print("Action Space:", env.action_space)
@@ -52,7 +52,7 @@ def train(env_fn, steps: int = 1e4, seed: int = 0, **env_kwargs):
     env.close()
 
 
-num_agents = 5
+num_agents = 50
 num_iterations = 100
 num_params = 2
 
@@ -110,7 +110,7 @@ def main():
                 'metric_reward' : 10,
                 'evaluation_penalty' : -1,
                 'not_dominated_reward' : 5,
-                'render_mode' : 'None'
+                'render_mode' : 'human'
                     }
 
     train(env_fn, steps=2e6, seed=0, **env_kwargs)
