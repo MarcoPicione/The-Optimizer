@@ -17,7 +17,7 @@ import pdb
 
 def train(env_fn, steps: int = 1e4, seed: int = 0, **env_kwargs):
     env = env_fn.parallel_env(**env_kwargs)
-    env.reset(seed=seed)
+    # env.reset(seed=seed)
     print(f"Starting training on {str(env.metadata['name'])}.")
     env = ss.pettingzoo_env_to_vec_env_v1(env)
     env = ss.concat_vec_envs_v1(env, num_vec_envs = 1, num_cpus=1, base_class="stable_baselines3")
@@ -52,7 +52,7 @@ def train(env_fn, steps: int = 1e4, seed: int = 0, **env_kwargs):
     env.close()
 
 
-num_agents = 50
+num_agents = 5
 num_iterations = 100
 num_params = 2
 
@@ -110,7 +110,7 @@ def main():
                 'metric_reward' : 10,
                 'evaluation_penalty' : -1,
                 'not_dominated_reward' : 0,
-                'render_mode' : 'human'
+                'render_mode' : 'None'
                     }
 
     train(env_fn, steps=2e6, seed=0, **env_kwargs)

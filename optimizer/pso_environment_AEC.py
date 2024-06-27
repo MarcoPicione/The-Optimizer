@@ -85,7 +85,7 @@ class raw_env(AECEnv, EzPickle):
         if is_last:
             # print("LAST")
             for k in self.rewards.keys():
-                self.rewards[k] += self.env.last_rewards[self.agent_name_mapping[k]]
+                self.rewards[k] = self.env.last_rewards[self.agent_name_mapping[k]]
 
             self.truncations = dict(zip(self.agents, [False for _ in self.agents]))
             if self.env.pso.iteration == self.pso_iterations:

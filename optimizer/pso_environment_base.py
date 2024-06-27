@@ -43,9 +43,9 @@ class pso_environment_base:
     def get_spaces(self):
         """Define the action and observation spaces for all of the agents."""
 
-        len_obs = 6
-        # low = np.array([0.] * len_obs)
-        # high = np.array([np.inf] * len_obs)
+        len_obs = 2
+        low = np.array([0.] * len_obs)
+        high = np.array([self.num_agents * self.pso_iterations, self.pso_iterations])
 
         # obs_space = Dict({
         #     # 'distance_from_good_points': Box(low = 0, high = np.inf, shape = (1,), dtype=np.float32),
@@ -57,7 +57,7 @@ class pso_environment_base:
         #     # 'num_skips': Discrete(self.pso_iterations)
         # })
 
-        obs_space = Box(low = 0, high = self.num_agents * self.pso_iterations, shape = (2,), dtype=np.float32)
+        obs_space = Box(low = low, high = high, shape = (2,), dtype=np.float32)
 
         
 
@@ -134,10 +134,11 @@ class pso_environment_base:
         # Negative reward if evaluated
         self.last_rewards[agent_id] = self.evaluation_penalty * action
         # Negative reward
-        if len(self.invalid_actions[agent_id]) > 0 and not action:
-            self.last_rewards[agent_id] += -10000 
+        if action in self.invalid_actions[agent_id]:
+            self.last_rewards[agent_id] =  self.last_rewards[agent_id] -10000 
 
         if is_last:
+            print("INVALID ", self.invalid_actions)
             # Update pareto
             dominated = self.pso.update_pareto_front()
             # If a particle is dominated and was evaluated add it to bad points list.
@@ -166,8 +167,8 @@ class pso_environment_base:
                 # positive_reward = diff_hv
 
                 # self.last_rewards[id] += self.metric_reward * positive_reward
-                self.last_rewards[id] += self.not_dominated_reward if not dominated[id] else -5 #self.dominated_penalty
-                self.last_rewards[id] += self.not_dominated_reward if not dominated[id] else 0
+                self.last_rewards[id] += self.not_dominated_reward if not dominated[id] else 0 #self.dominated_penalty
+                # self.last_rewards[id] += self.not_dominated_reward if not dominated[id] else 0
 
 
                 # print(self.last_rewards[id])
@@ -175,6 +176,7 @@ class pso_environment_base:
 
             self.pso.iteration += 1
             self.action_list = []
+            self.invalid_actions = [[] for _ in range(self.num_agents)]
 
             # Generate new observations
             obs_list = self.observe_list()
@@ -228,8 +230,6 @@ class pso_environment_base:
             points_in_sphere = sphere(particle.position, self.radius, np.array(self.bad_points)) if len(self.bad_points) > 0 else 0
             if points_in_sphere == 0:
                 self.invalid_actions[i] = [0]
-            else:
-                self.invalid_actions[i] = []
 
             particle_observation = [
                         points_in_sphere,
@@ -260,11 +260,7 @@ class pso_environment_base:
             #         print("SHIT")
             
             observe_list[i] = particle_observation
-
         return observe_list
-    
-    def action_masks(self):
-        return [[action not in self.invalid_actions[i] for i, action in enumerate(self.possible_actions)]]
     
     def render(self):
         fig, ax = plt.subplots(figsize=(10, 10))
