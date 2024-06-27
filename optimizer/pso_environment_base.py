@@ -271,8 +271,24 @@ class pso_environment_base:
         plt.scatter([p.position[0] for p in self.pso.particles],[p.position[1] for p in self.pso.particles], color = 'black', marker = '.', s = 100)
         plt.scatter([p[0] for p in self.bad_points], [p[1] for p in self.bad_points], color = 'blue', marker = 'x', s = 50)
         plt.scatter([p.position[0] for p in self.pso.pareto_front], [p.position[1] for p in self.pso.pareto_front], color = 'green', marker = '*', s = 50)
-        rect = patches.Rectangle((-2, -10), 4, 20, linewidth=1, edgecolor=None, facecolor='green', alpha=0.2)
+        # rect = patches.Rectangle((-2, -10), 4, 20, linewidth=1, edgecolor=None, facecolor='green', alpha=0.2)
+        # ax.add_patch(rect)
+
+        rect = patches.Rectangle((-4 * np.pi + np.pi / 2, -10), np.pi / 2, 20, linewidth=1, edgecolor=None, facecolor='green', alpha=0.2)
         ax.add_patch(rect)
+
+        rect = patches.Rectangle((-2 * np.pi + np.pi / 2, -10), np.pi / 2, 20, linewidth=1, edgecolor=None, facecolor='green', alpha=0.2)
+        ax.add_patch(rect)
+
+        rect = patches.Rectangle((np.pi / 2, -10), np.pi / 2, 20, linewidth=1, edgecolor=None, facecolor='green', alpha=0.2)
+        ax.add_patch(rect)
+
+        rect = patches.Rectangle((2 * np.pi + np.pi / 2, -10), np.pi / 2, 20, linewidth=1, edgecolor=None, facecolor='green', alpha=0.2)
+        ax.add_patch(rect)
+
+        rect = patches.Rectangle((4 * np.pi + np.pi / 2, -10), np.pi / 2, 20, linewidth=1, edgecolor=None, facecolor='green', alpha=0.2)
+        ax.add_patch(rect)
+
         for p in self.pso.particles:
             c = plt.Circle(p.position, self.radius, color = 'black', fill = False)
             # plt.plot([p.position[0], new_position[0]], [p.position[1], new_position[1]], '--')

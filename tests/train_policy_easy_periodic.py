@@ -62,10 +62,10 @@ ub = [10.] * num_params
 optimizer.Logger.setLevel('INFO')
 
 def objective1(x):
-    return (x[0] + 2) ** 2 - 10
+    return 3 * np.cos(x[0])
 
 def objective2(x):
-    return (x[0] - 2) ** 2 + 20
+    return 3 * np.cos(x[0] + np.pi / 2) + 1
 
 use_reinforcement_learning = 0
 
