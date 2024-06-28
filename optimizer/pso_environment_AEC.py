@@ -55,7 +55,7 @@ class raw_env(AECEnv, EzPickle):
         if seed is not None:
             self.env._seed(seed=seed)
 
-        self.env.reset()
+        obs = self.env.reset()
         self.agents = self.possible_agents[:]
         self._agent_selector.reinit(self.agents)
         self.agent_selection = self._agent_selector.next()
@@ -65,6 +65,7 @@ class raw_env(AECEnv, EzPickle):
         self.terminations = dict(zip(self.agents, [False for _ in self.agents]))
         self.truncations = dict(zip(self.agents, [False for _ in self.agents]))
         self.infos = dict(zip(self.agents, [{"cumulative_rewards" : []} for _ in self.agents]))
+        return obs
 
     def close(self):
         pass

@@ -38,14 +38,14 @@ class pso_environment_base:
         lower_bounds = np.array(self.possible_pso.lower_bounds)
         self.max_dist = np.linalg.norm(upper_bounds - lower_bounds)
         self.radius = 0.03 * self.max_dist
-        print("Max ", self.max_dist)
+        print("Created environment")
 
     def get_spaces(self):
         """Define the action and observation spaces for all of the agents."""
 
         len_obs = 2
         low = np.array([0.] * len_obs)
-        high = np.array([self.num_agents * self.pso_iterations, self.pso_iterations])
+        high = np.array([self.num_agents * self.pso_iterations, self.num_agents * self.pso_iterations])
 
         # obs_space = Dict({
         #     # 'distance_from_good_points': Box(low = 0, high = np.inf, shape = (1,), dtype=np.float32),
@@ -119,12 +119,13 @@ class pso_environment_base:
         self.last_obs = obs_list
         self.last_rewards = [np.float64(0) for _ in range(self.num_agents)]
         self.last_dones = [False for _ in range(self.num_agents)]
-
-        return obs_list[0]
+        return obs_list
 
     def step(self, action, agent_id, is_last):
+        # print("PREC REW ", self.last_rewards)
         self.action_list.append(action)
         p = self.pso.particles[agent_id]
+        # print("AGENT ", agent_id, "ACTION ", action)
         
         # Execute actions
         p.num_skips = 0 if action else p.num_skips + 1
@@ -134,11 +135,11 @@ class pso_environment_base:
         # Negative reward if evaluated
         self.last_rewards[agent_id] = self.evaluation_penalty * action
         # Negative reward
-        if action in self.invalid_actions[agent_id]:
-            self.last_rewards[agent_id] =  self.last_rewards[agent_id] -10000 
+        # if action in self.invalid_actions[agent_id]:
+        #     self.last_rewards[agent_id] =  self.last_rewards[agent_id] -10000 
 
         if is_last:
-            print("INVALID ", self.invalid_actions)
+            # print("INVALID ", self.invalid_actions)
             # Update pareto
             dominated = self.pso.update_pareto_front()
             # If a particle is dominated and was evaluated add it to bad points list.
@@ -227,13 +228,15 @@ class pso_environment_base:
             # if np.linalg.norm(particle.velocity) == 0: print("UpSI")
             # distance_bad_points = distance_bad_points / self.distance_normalization
 
-            points_in_sphere = sphere(particle.position, self.radius, np.array(self.bad_points)) if len(self.bad_points) > 0 else 0
-            if points_in_sphere == 0:
+            bad_points_in_sphere = sphere(particle.position, self.radius, np.array(self.bad_points)) if len(self.bad_points) > 0 else 0
+            good_points_in_sphere = sphere(particle.position, self.radius, np.array([p.position for p in self.pso.pareto_front])) if len(self.bad_points) > 0 else 0
+            if bad_points_in_sphere == 0 and good_points_in_sphere == 0:
                 self.invalid_actions[i] = [0]
 
             particle_observation = [
-                        points_in_sphere,
-                        particle.iteration_from_best_position,
+                        bad_points_in_sphere,
+                        good_points_in_sphere,
+                        # particle.iteration_from_best_position,
                         # # mean_distance,
                         # distance_good_points,
                         # num_good_points,
@@ -249,7 +252,7 @@ class pso_environment_base:
             #     # 'num_good_points':num_good_points,
             #     # 'distance_from_bad_points': (distance_bad_points, ),
             #     # 'num_bad_points': num_bad_points,
-            #     'points_in_sphere' : points_in_sphere,
+            #     'bad_points_in_sphere' : points_in_sphere,
             #     # 'iter_from_best': particle.iteration_from_best_position,
             #     # 'num_skips': particle.num_skips,
             # }
