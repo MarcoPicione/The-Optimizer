@@ -19,6 +19,8 @@ class Particle:
         self.id = id
         self.topology = topology
 
+        self.evaluated = -1
+
     def update_velocity(self,
                         pareto_front,
                         crowding_distances,

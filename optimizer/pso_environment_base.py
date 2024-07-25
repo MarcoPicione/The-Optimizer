@@ -42,9 +42,9 @@ class pso_environment_base:
 
     def get_spaces(self):
         # Define the action and observation spaces for all of the agents
-        len_obs = 3
+        len_obs = 5
         low = np.array([0.] * len_obs)
-        high = np.array([self.num_agents * self.pso_iterations] * 2 + [1])
+        high = np.array([self.num_agents * self.pso_iterations] * 2 + [self.num_agents] * 3)
         obs_space = Box(low = low, high = high, shape = (len_obs,), dtype=np.float32)
         act_space = Discrete(2)
 
@@ -82,6 +82,7 @@ class pso_environment_base:
         p = self.pso.particles[agent_id]
         
         # Execute actions
+        p.evaluated = action
         optimization_output = self.pso.objective.evaluate(np.array([p.position]))[0] if action else [np.inf] * len(p.fitness)
         p.set_fitness(optimization_output)
 
@@ -134,6 +135,9 @@ class pso_environment_base:
             obs_list = self.observe_list()
             self.last_obs = obs_list
 
+            for particle in self.pso.particles:
+                particle.evaluated = -1
+
             # plt.figure()
             # pareto_x = [particle.fitness[0] for particle in self.pso.pareto_front]
             # pareto_y = [particle.fitness[1] for particle in self.pso.pareto_front]
@@ -155,6 +159,7 @@ class pso_environment_base:
                             self.pso_iterations
                             )
         for i, obs in enumerate(observations):
+            print(observations)
             if obs[0] > 0: self.invalid_actions[i].append(0)              
         return observations
     

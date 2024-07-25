@@ -44,7 +44,7 @@ def sphere(position, radius, points_positions):
     for i, p in enumerate(points_positions): 
         if np.linalg.norm(position - p) < radius:
             mask[i] = True
-    return np.sum(mask), mask
+    return mask
 
 def observe_list(pso, good_points_positions, bad_points_positions, radius, max_dist, pso_iterations):
         
@@ -58,8 +58,25 @@ def observe_list(pso, good_points_positions, bad_points_positions, radius, max_d
         # progress = pso.iteration / pso_iterations
         
         for i, particle in enumerate(pso.particles):
-            bad_points_in_sphere = sphere(particle.position, radius, bad_points_positions) if len(bad_points_positions) > 0 else 0
-            good_points_in_sphere = sphere(particle.position, radius, good_points_positions) if len(good_points_positions) > 0 else 0
+            bad_points_in_sphere = sum(sphere(particle.position, radius, bad_points_positions)) if len(bad_points_positions) > 0 else 0
+            good_points_in_sphere = sum(sphere(particle.position, radius, good_points_positions)) if len(good_points_positions) > 0 else 0
+
+            agents_positions = np.array([p.position for p in pso.particles])
+
+            agents_in_sphere_mask = sphere(particle.position, radius, agents_positions)
+            num_not_evaluated_agents_in_sphere = 0
+            num_evaluated_agents_in_sphere = 0
+            num_unknown_evaluated_agents_in_sphere = 0
+
+            for i, p in enumerate(pso.particles):
+                if(agents_in_sphere_mask[i]):
+                    eval = p.evaluated
+                    if eval == 0: 
+                        num_not_evaluated_agents_in_sphere += 1
+                    elif eval == 1:
+                        num_evaluated_agents_in_sphere += 1
+                    else:
+                        num_unknown_evaluated_agents_in_sphere += 1
 
             # distance = np.linalg.norm(positions - positions[i], axis=1)
             # mean_distance = np.sum(distance) / (len(pso.particles) - 1) / max_dist
@@ -67,6 +84,9 @@ def observe_list(pso, good_points_positions, bad_points_positions, radius, max_d
             particle_observation = [
                         bad_points_in_sphere,
                         good_points_in_sphere,
+                        num_not_evaluated_agents_in_sphere,
+                        num_evaluated_agents_in_sphere,
+                        num_unknown_evaluated_agents_in_sphere
                         # particle.iterations_with_no_improvement,
                         # mean_distance,
                         # progress,
