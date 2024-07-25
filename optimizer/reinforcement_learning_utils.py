@@ -44,7 +44,7 @@ def sphere(position, radius, points_positions):
     for i, p in enumerate(points_positions): 
         if np.linalg.norm(position - p) < radius:
             mask[i] = True
-    return np.sum(mask)
+    return np.sum(mask), mask
 
 def observe_list(pso, good_points_positions, bad_points_positions, radius, max_dist, pso_iterations):
         
