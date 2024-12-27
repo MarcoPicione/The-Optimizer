@@ -40,7 +40,7 @@ class MOPSO(Optimizer):
 
     def __init__(self, objective, lower_bounds, upper_bounds, num_particles=50, inertia_weight=0.5,
                  cognitive_coefficient=1, social_coefficient=1, initial_particles_position='random',
-                 default_point=None, exploring_particles=False, topology='random', max_pareto_length=-1):
+                 default_point=None, exploring_particles=False, topology='random', max_pareto_length=-1, scaler = 0.1):
         """
         Initializes the MOPSO algorithm with the specified parameters.
         """
@@ -52,7 +52,7 @@ class MOPSO(Optimizer):
                  lower_bounds, upper_bounds, num_particles=50,
                  inertia_weight=0.5, cognitive_coefficient=1, social_coefficient=1,
                  initial_particles_position='random', default_point=None,
-                 exploring_particles=False, topology='random',
+                 exploring_particles=False, scaler = 0.1, topology='random',
                  max_pareto_lenght=-1,
                  rl_model = None, radius_scaler = 0.021):
 
@@ -92,7 +92,7 @@ class MOPSO(Optimizer):
             'lower_bounds', 'upper_bounds', 'random', 'gaussian'}
         
         VALID_TOPOLOGIES = {
-            'random', 'lower_weighted_crowding_distance', 'round_robin'}
+            'random', 'lower_weighted_crowding_distance', 'round_robin', 'lower_crowding_distance'}
 
         if topology not in VALID_TOPOLOGIES:
             raise ValueError(
@@ -154,15 +154,22 @@ class MOPSO(Optimizer):
         # Randomizer.rng = np.random.default_rng(seed)
 
         # Reinforcement learning stuff
+        self.scaler = scaler
+        self.max_dist = np.linalg.norm(np.array(self.upper_bounds) - np.array(self.lower_bounds))
+        
         self.use_rl = False
         self.rl_model = rl_model
         self.evaluations = []
+        self.evaluations_nzz_taken = []
+        self.evaluations_nzz_not_taken = []
+        self.stopped_on_time=False
+
+        self.bad_points = []
         if self.rl_model is not None:
             self.use_rl = True
             self.max_dist = np.linalg.norm(np.array(self.upper_bounds) - np.array(self.lower_bounds))
             self.radius = radius_scaler * self.max_dist
-            print(f"Radius {self.radius}")
-            self.bad_points = []
+            print(f"Radius_scaler {radius_scaler}")
             self.bad_points_per_iteration = []
             self.pareto_points_per_iteration = []
 
@@ -216,7 +223,7 @@ class MOPSO(Optimizer):
         obj = FileManager.load_pickle("checkpoint/mopso.pkl")
         self.__dict__ = obj.__dict__
 
-    def step(self, mask=None, max_iterations_without_improvement=None):
+    def step(self, mask=None, max_iterations_without_improvement=None, observations=None, evaluations_max=np.inf):
         Logger.debug(f"Iteration {self.iteration}")
         if mask is None:
             if self.use_rl:
@@ -227,7 +234,28 @@ class MOPSO(Optimizer):
             if len(mask) != self.num_particles:
                 raise Exception("Mask must be of length num_particles")
 
-        self.evaluations.append(sum(mask))    
+        sum_mask = sum(mask)
+        pos = 0
+        while (sum(self.evaluations) + sum_mask > evaluations_max):
+            # print(f"LOOP {sum_mask}")
+            mask[pos] = 0
+            pos += 1
+            sum_mask = sum(mask)
+
+        self.evaluations.append(sum_mask)
+        Logger.debug(f"Evaluations {sum(self.evaluations)}")
+        counter_nzz_taken = 0
+        counter_nzz_not_taken = 0
+        if observations is not None:
+            for i, obs in enumerate(observations):
+                if obs != [0,0]:
+                    if mask[i]:
+                        counter_nzz_taken += 1
+                    else:
+                        counter_nzz_not_taken += 1
+
+        self.evaluations_nzz_not_taken.append(counter_nzz_not_taken)  
+        self.evaluations_nzz_taken.append(counter_nzz_taken)  
         optimization_output = self.objective.evaluate(
             [particle.position for particle in self.particles], mask)
         # self.remove_inf(mask)
@@ -237,10 +265,9 @@ class MOPSO(Optimizer):
         FileManager.save_csv([np.concatenate([particle.position, np.ravel(
             particle.fitness)]) for particle in self.particles],
             'history/iteration' + str(self.iteration) + '.csv')
-
-        dominated_particles, crowding_distances = self.update_pareto_front()
-        if self.use_rl:
-            self.bad_points += find_new_bad_points(self.particles, dominated_particles, mask)
+        # if self.use_rl:
+        #     pareto_front_old = deepcopy(self.pareto_front)
+        _, crowding_distances = self.update_pareto_front(mask)
 
         for particle in self.particles:
             particle.update_velocity(self.pareto_front,
@@ -254,15 +281,18 @@ class MOPSO(Optimizer):
         self.iteration += 1
         return improving_evaluations
 
-    def optimize(self, num_iterations=100, max_iterations_without_improvement=None, time_limit = np.inf):
+    def optimize(self, num_iterations=100, max_iterations_without_improvement=None, evaluations_max = np.inf, time_limit = np.inf):
         Logger.info("Starting MOPSO optimization")
         self.useful_evaluations = []
         pareto_len = []
         crowding_distances = []
         self.num_iterations = num_iterations
-        start_time= time.time() 
-        for _ in range(self.iteration, num_iterations):
+        start_time= time.time()
+        stop = num_iterations if evaluations_max == np.inf else int(1e9)
+
+        for _ in range(self.iteration, stop):
             mask = None
+            observations=None
             if self.use_rl:
                 observations = observe_list(self,
                             np.array([p.position for p in self.pareto_front]),
@@ -289,26 +319,32 @@ class MOPSO(Optimizer):
                 # print(mask)
                 self.bad_points_per_iteration.append(np.sum(observations, axis = 0)[0])
                 self.pareto_points_per_iteration.append(np.sum(observations, axis = 0)[1])    
-            self.step(max_iterations_without_improvement = max_iterations_without_improvement, mask = mask)
+            self.step(max_iterations_without_improvement = max_iterations_without_improvement, mask = mask, observations=observations, evaluations_max=evaluations_max)
             pareto_len.append(len(self.pareto_front))
             # crowding_distances.append(list(self.calculate_crowding_distance(self.particles).values()))
             elapsed_time = time.time() - start_time
+
             if elapsed_time >= time_limit:
                 print("Reached time limit") 
+                self.stopped_on_time=True
+                break
+
+            if sum(self.evaluations) >= evaluations_max:
+                print(f"Reached max amount of evaluations. Tot evaluations {sum(self.evaluations)}") 
                 break
         self.execution_time = elapsed_time
 
         Logger.info("MOPSO optimization finished")
-        self.save_state()
-        self.export_state()
+        # self.save_state()
+        # self.export_state()
 
-        FileManager.save_csv(self.useful_evaluations, 'useful_evaluations_' + str(self.use_rl) + '.csv')
-        FileManager.save_csv(pareto_len, 'pareto_len_' + str(self.use_rl) +'.csv')
-        FileManager.save_csv(crowding_distances, 'crowding_distances_' + str(self.use_rl) +'.csv')
+        # FileManager.save_csv(self.useful_evaluations, 'useful_evaluations_' + str(self.use_rl) + '.csv')
+        # FileManager.save_csv(pareto_len, 'pareto_len_' + str(self.use_rl) +'.csv')
+        # FileManager.save_csv(crowding_distances, 'crowding_distances_' + str(self.use_rl) +'.csv')
 
         return self.pareto_front
 
-    def update_pareto_front(self):
+    def update_pareto_front(self, mask):
         Logger.debug("Updating Pareto front")
         pareto_lenght = len(self.pareto_front)
         particles = self.pareto_front + self.particles
@@ -316,10 +352,13 @@ class MOPSO(Optimizer):
             [particle.fitness for particle in particles])
         dominated = get_dominated(particle_fitnesses, pareto_lenght)
 
-        self.pareto_front = [copy(particles[i]) for i in range(
+        self.bad_points += find_new_bad_points(self.particles, dominated[pareto_lenght:], self.pareto_front, dominated[:pareto_lenght], mask)
+
+        self.pareto_front = [deepcopy(particles[i]) for i in range(
             len(particles)) if not dominated[i]]
         crowding_distances = self.calculate_crowding_distance(
             self.pareto_front)
+        print(crowding_distances.values())
         self.pareto_front.sort(
             key=lambda x: crowding_distances[x], reverse=True)
 
@@ -365,9 +404,10 @@ class MOPSO(Optimizer):
             upper_count = sum(
                 [1 for p in self.particles if p.position[i] > particle.position[i]])
             if lower_count > upper_count:
-                particle.velocity[i] = 1
+                particle.velocity[i] = self.scaler * self.max_dist
             else:
-                particle.velocity[i] = -1
+                particle.velocity[i] = -1 * self.scaler * self.max_dist
+        particle.iterations_with_no_improvement = 0
     
     def remove_inf(self, mask):
         for id, p in enumerate(self.particles):

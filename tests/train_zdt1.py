@@ -12,9 +12,10 @@ import torch as th
 from stable_baselines3.common.vec_env import VecMonitor
 import pdb
 from optimizer.trainer import train
+from optimizer.tester import explainability
 
-num_agents = 2
-num_iterations = 200
+num_agents = 50
+num_iterations = 100
 num_params = 30
 
 lb = [0.] * num_params
@@ -44,20 +45,27 @@ def main():
 
     pso = optimizer.MOPSO(objective=objective, lower_bounds=lb, upper_bounds=ub,
                         num_particles=num_agents,
-                        inertia_weight=0.4, cognitive_coefficient=4, social_coefficient=2, initial_particles_position='random', exploring_particles=False,
-                        rl_model=None)
+                        inertia_weight=0.4, cognitive_coefficient=1.5, social_coefficient=2, initial_particles_position='random', exploring_particles=False,
+                        rl_model=None, topology='round_robin')
 
     env_fn = pso_environment_AEC
     scaler = 150
     env_kwargs = {'pso' : pso,
                 'pso_iterations' : num_iterations,
-                'metric_reward' : 1 / 24.66408110242748 * scaler,
-                'evaluation_penalty' : -1,
-                'not_dominated_reward' : 2,
+                'metric_reward' : 1,
+                'metric_reward_hv_diff': 0, #130 max
+                'evaluation_penalty' : -0.1, #-300/num_iterations,
+                'not_dominated_reward' : 0,#600/num_iterations,
                 'render_mode' : 'None'
                     }
 
-    train(env_fn, steps=1000000, seed=0, **env_kwargs)
+    name = f"zdt1_ag_{num_agents}_iter_{num_iterations}_mr_{env_kwargs['metric_reward']}_mdr_{env_kwargs['metric_reward_hv_diff']}_p_{env_kwargs['evaluation_penalty']}_ndr_{env_kwargs['not_dominated_reward']}"
+    train(env_fn, steps=500000, seed=0, name = name, **env_kwargs)
+
+    #TEST
+
+    rl_model = f"./{name}_model"
+    explainability(rl_model, 5)
 
 if __name__ == "__main__":
     main()

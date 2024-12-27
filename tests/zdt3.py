@@ -28,18 +28,18 @@ def zdt3_objective2(x):
 
 optimizer.FileManager.working_dir = "tmp/zdt3/"
 optimizer.FileManager.loading_enabled = False
-optimizer.FileManager.saving_enabled = True
+optimizer.FileManager.saving_enabled = False
 
 objective = optimizer.ElementWiseObjective([zdt3_objective1, zdt3_objective2])
 
 pso = optimizer.MOPSO(objective=objective, lower_bounds=lb, upper_bounds=ub,
                       num_particles=num_agents,
-                      inertia_weight=0.4, cognitive_coefficient=1, social_coefficient=2, initial_particles_position='random', topology = 'random')
+                      inertia_weight=1., cognitive_coefficient=2, social_coefficient=2, initial_particles_position='random', topology = 'round_robin')
 
 # run the optimization algorithm
 pso.optimize(num_iterations)
 
-fig, ax = plt.subplots()
+fig, ax = plt.subplots(figsize=(9,8))
 
 pareto_front = pso.pareto_front
 n_pareto_points = len(pareto_front)
@@ -62,9 +62,26 @@ for r in regions:
 real_x = np.concatenate([x for x, _ in pf])
 real_y = np.concatenate([y for _, y in pf])
 
-plt.scatter(real_x, real_y, s=5, c='red')
-plt.scatter(pareto_x, pareto_y, s=5)
+plt.scatter(real_x, real_y, s=70, c='red', label = 'Known optimal Pareto front')
+plt.scatter(pareto_x, pareto_y, s=70, label = 'Pareto front')
+
+lw = 4
+ls = 20
+fs = 22
+leg_fs = 16
+ax.spines['top'].set_linewidth(lw)
+ax.spines['right'].set_linewidth(lw)
+ax.spines['left'].set_linewidth(lw)
+ax.spines['bottom'].set_linewidth(lw)
+ax.tick_params(axis='both', which='major', labelsize=ls, width=2)
+plt.xticks(ax.get_xticks()[1:-1], weight = 'bold')
+plt.yticks(ax.get_yticks()[1:-1], weight = 'bold')
+plt.legend(prop={'weight':'bold', 'size': leg_fs}, scatterpoints=1, markerscale=2, fontsize=fs)
+plt.title('ZDT 3', fontweight='bold', fontsize=fs + 2)
+plt.xlabel('Objective 1', fontweight='bold', fontsize=fs)
+plt.ylabel('Objective 2', fontweight='bold', fontsize=fs, labelpad=-15)
 
 if not os.path.exists('tmp'):
     os.makedirs('tmp')
-plt.savefig('tmp/pf.png')
+plt.savefig('tmp/zdt3.png')
+np.save("zdt3.npy",np.array([pareto_x, pareto_y]))

@@ -1,6 +1,7 @@
 import numpy as np
 from optimizer import Randomizer
 from optimizer.util import get_dominated
+import copy
 
 
 class Particle:
@@ -15,6 +16,7 @@ class Particle:
         self.fitness = np.full(self.num_objectives, np.inf)
         self.local_best_fitnesses = []
         self.local_best_positions = []
+        self.local_bests = []
         self.iterations_with_no_improvement = 0
         self.id = id
         self.topology = topology
@@ -28,7 +30,9 @@ class Particle:
                         cognitive_coefficient=1,
                         social_coefficient=1):
         leader = self.get_pareto_leader(pareto_front, crowding_distances)
-        best_position = Randomizer.rng.choice(self.local_best_positions)
+        best_position = lower_crowding_distance_topology(self.local_bests, self.calculate_crowding_distance(self.local_bests)).position
+        # best_position = weighted_crowding_distance_topology(self.local_bests, self.calculate_crowding_distance(self.local_bests), higher=False).position
+        # best_position = Randomizer.rng.choice(self.local_bests).position
         cognitive_random = Randomizer.rng.uniform(0, 1)
         social_random = Randomizer.rng.uniform(0, 1)
         cognitive = cognitive_coefficient * cognitive_random * \
@@ -63,43 +67,74 @@ class Particle:
         self.best_fitness = best_fitness
 
     def update_best(self):
-        len_fitness = len(self.local_best_fitnesses)
+        len_fitness = len(self.local_bests)
+        particles = self.local_bests
+
+        if self not in particles:
+            particles = particles + [copy.copy(self)]
         fitnesses = np.array(
-            [f for f in self.local_best_fitnesses] + [self.fitness])
-        positions = np.array(
-            [p for p in self.local_best_positions] + [self.position])
+            [p.fitness for p in particles])
+        # positions = np.array(
+        #     [p.position for p in particles])
 
         dominated = get_dominated(fitnesses, len_fitness)
 
-        new_local_best_fitnesses = [fitnesses[i]
-                                    for i in range(len(fitnesses)) if not dominated[i]]
+        new_local_bests = [particles[i] for i in range(len(particles)) if not dominated[i]]
 
         # if the new fitness is different from the old one, reset the counter
-        if np.array_equal(new_local_best_fitnesses, self.local_best_fitnesses):
+        if np.array_equal(new_local_bests, self.local_bests):
             self.iterations_with_no_improvement += 1
         else:
             self.iterations_with_no_improvement = 0
-        self.local_best_fitnesses = new_local_best_fitnesses
-        self.local_best_positions = [positions[i]
-                                     for i in range(len(positions)) if not dominated[i]]
+        self.local_bests = copy.copy(new_local_bests)
+        # self.local_best_positions = [positions[i]
+        #                              for i in range(len(positions)) if not dominated[i]]
 
     def get_pareto_leader(self, pareto_front, crowding_distances):
         if self.topology == "random":
             return Randomizer.rng.choice(pareto_front)
         elif self.topology == "lower_weighted_crowding_distance":
             return weighted_crowding_distance_topology(pareto_front, crowding_distances, higher=False)
+        elif self.topology == "lower_crowding_distance":
+            return lower_crowding_distance_topology(pareto_front, crowding_distances)
         elif self.topology == "round_robin":
             return round_robin_topology(pareto_front, self.id)
         else:
             raise ValueError(
                 f"MOPSO: {self.topology} not implemented!")
 
-        dominated = get_dominated(fitnesses, len_fitness)
+    def calculate_crowding_distance(self, pareto_front):
+        if len(pareto_front) == 0:
+            return []
+        num_objectives = len(np.ravel(pareto_front[0].fitness))
+        distances = [0] * len(pareto_front)
+        point_to_distance = {}
+        for i in range(num_objectives):
+            # Sort by objective i
+            sorted_front = sorted(
+                pareto_front, key=lambda x: np.ravel(x.fitness)[i])
+            # Set the boundary points to infinity
+            distances[0] = float('inf')
+            distances[-1] = float('inf')
+            # Normalize the objective values for calculation
+            min_obj = np.ravel(sorted_front[0].fitness)[i]
+            max_obj = np.ravel(sorted_front[-1].fitness)[i]
+            norm_denom = max_obj - min_obj if max_obj != min_obj else 1
+            for j in range(1, len(pareto_front) - 1):
+                distances[j] += (np.ravel(sorted_front[j + 1].fitness)[i] -
+                                 np.ravel(sorted_front[j - 1].fitness)[i]) / norm_denom
+        for i, point in enumerate(pareto_front):
+            point_to_distance[point] = distances[i]
+        return point_to_distance
 
 def weighted_crowding_distance_topology(pareto_front, crowding_distances, higher):
     pdf = boltzmann(crowding_distances, higher)
     return Randomizer.rng.choice(pareto_front, p=pdf)
 
+
+def lower_crowding_distance_topology(pareto_front, crowding_distances):
+    id = np.argmin(crowding_distances)
+    return pareto_front[id]
 
 def round_robin_topology(pareto_front, id):
     index = id % len(pareto_front)

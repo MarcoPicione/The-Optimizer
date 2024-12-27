@@ -13,7 +13,7 @@ from stable_baselines3.common.vec_env import VecMonitor
 import pdb
 from optimizer.trainer import train
 
-num_agents = 20
+num_agents = 30
 num_iterations = 100
 num_params = 2
 
@@ -52,10 +52,10 @@ def main():
                 'metric_reward_hv_diff' : 0, #1 / 54.06236516259962 * scaler,
                 'evaluation_penalty' : -1,
                 'not_dominated_reward' : 0,
-                'render_mode' : 'None'
+                'render_mode' : 'human'
                     }
 
-    name = f"model_exp_hv_{scaler}_0_0.5"
+    name = f"model_particle_hv_{scaler}_0_0_1000agents"
     train(env_fn, steps=1000000, seed=0, name=name, **env_kwargs)
 
 if __name__ == "__main__":

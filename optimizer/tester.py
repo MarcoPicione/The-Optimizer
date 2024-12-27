@@ -13,6 +13,12 @@ import plotly.io as pio
 from copy import deepcopy
 import os
 import matplotlib.patches as mpatches
+import multiprocessing
+from multiprocessing import Pool
+from tqdm.contrib.concurrent import process_map
+import copy
+import matplotlib.patches as patches
+
 
 VALID_MODELS = ['pso', 'pso_trained_policy', 'pso_random_policy', 'pso_explainable_policy']
 
@@ -23,6 +29,7 @@ class results_container:
         self.models_keys = list(models.keys())
         self.metrics_keys = list(models[next(iter(models))].keys())
         self.metrics_keys.remove('pareto_front')
+        self.metrics_keys.remove('stopped_on_time')
         self.num_metrics = len(self.metrics_keys)
         self.num_models = len(self.models_keys)
         self.num_seeds = len(self.res.keys())
@@ -44,11 +51,31 @@ class results_container:
         return res
 
     def print_results(self):
+        print(f"Number of seeds: {len(list(self.res.keys()))}")
         for i, mod in enumerate(self.models_keys):
             print(f"Model {mod}:")
             for j, met in enumerate(self.metrics_keys):
-                print(f"\t{met}: {self.get_metric_means(met)[mod]} +- {self.get_metric_stds(met)[mod] / np.sqrt(self.num_seeds)}")
+                print(f"\t{met}: {self.get_metric_means(met)[mod]} +- {self.get_metric_stds(met)[mod]}")
 
+    def save_results(self, name):
+        res = dict()
+        for i, mod in enumerate(self.models_keys):
+            metrics = {}
+            for met in list(self.metrics_keys):
+                metrics[met] = (self.get_metric_means(met)[mod], self.get_metric_stds(met)[mod])
+            res[mod] = metrics.copy()
+        
+        out_file = open(f"{name}_means.json", "w")
+        json.dump(res, out_file, indent = 6)
+        out_file.close()
+
+        paretos={}
+        for k in self.models_keys:
+            paretos[k]={[]}
+        for k in self.models_keys:
+            paretos[k]={[]}
+        
+        
     def calculate_metrics_momenta(self):
         metrics = np.zeros((self.num_seeds, self.num_models, self.num_metrics))
         for s, seed in enumerate(self.res.keys()):
@@ -94,25 +121,56 @@ class results_container:
             elif num_objectives == 3: plot_pareto_3d(paretos, result['seed'], known_pareto)
             else: print(f"No implementation of plot fuction for {num_objectives} objectives")
 
-def test_model(objective, mopso_parameters, num_iterations, rl_model, ref_point, seeds, name, plot_paretos_enabled = False, print_results_enabled = True, known_pareto=None, time_limit = np.inf, models_to_test = VALID_MODELS, verbose = 0):
-    results = dict()
-    for seed in tqdm(seeds, desc="Testing seed", unit="iter"):
-        res = test_seed(objective, mopso_parameters, num_iterations, rl_model, ref_point, seed, time_limit, models_to_test = models_to_test, verbose = verbose)
-        results[f"{seed}"] = res
+def clean_on_time(res):
+    to_be_removed = True
+    while(to_be_removed):
+        for i, r in enumerate(res):
+            to_be_removed = False
+            for k in r['models'].keys():
+                if r['models'][k]['stopped_on_time']:
+                    to_be_removed = True
+            if to_be_removed:        
+                res.pop(i)
+                break
+    return res
 
-    out_file = open(f"{name}.json", "w")
+def test_model(objective, mopso_parameters, num_iterations, rl_model, ref_point, seeds, save_path, n_processes=1, plot_paretos_enabled = False, print_results_enabled = True, save_results_enabled = True, known_pareto=None, time_limit = np.inf, evaluations_max=np.inf, models_to_test = VALID_MODELS, verbose = 0):
+    
+    file = f"{save_path}_results_{evaluations_max}.json"
+    # if not os.path.isfile(file):
+    if n_processes > 1:
+        args = []
+        for s in seeds:
+            args.append((copy.deepcopy(objective), mopso_parameters, num_iterations, rl_model, ref_point, s, time_limit, evaluations_max, models_to_test, verbose))
+        with Pool(n_processes) as pool:
+            res = list(tqdm(pool.starmap(test_seed, args), total=len(args)))
+    else:
+        res = []
+        for s in seeds:
+            res.append(test_seed(copy.deepcopy(objective), mopso_parameters, num_iterations, rl_model, ref_point, s, time_limit, evaluations_max, models_to_test, verbose))
+    
+    res=clean_on_time(res)
+
+    results=dict(zip(seeds, res))
+    out_file = open(file, "w")
     json.dump(results, out_file, indent = 6)
     out_file.close()
 
+    # else:
+    #     print(f"Loading radius {mopso_parameters['radius_scaler']}")
+    #     f_obj = open(file,)
+    #     results = json.load(f_obj)
+
     results_obj = results_container(results)
     if print_results_enabled: results_obj.print_results()
+    if save_results_enabled: results_obj.save_results(save_path)
     if plot_paretos_enabled: results_obj.plot_paretos(known_pareto)
 
     return results_obj
 
-def test_seed(objective, mopso_parameters, num_iterations, rl_model, ref_point, seed, time_limit = np.inf, models_to_test = VALID_MODELS, verbose = 0):
-
-    print(f"Testing models: {models_to_test}")
+def test_seed(objective, mopso_parameters, num_iterations, rl_model, ref_point, seed, time_limit = np.inf, evaluations_max=np.inf, models_to_test = VALID_MODELS, verbose = 0):
+    global VALID_MODELS
+    print(f"Testing models: {models_to_test} with scaler {mopso_parameters['radius_scaler']}")
     res =    {'seed'   : seed,
               'models' : {}
              }
@@ -132,20 +190,26 @@ def test_seed(objective, mopso_parameters, num_iterations, rl_model, ref_point, 
                             initial_particles_position='random', exploring_particles = mopso_parameters['exploring_particles'],
                             rl_model=None, radius_scaler=mopso_parameters['radius_scaler'])
 
-        start_time_pso = time.time()                    
-        pso.optimize(num_iterations=num_iterations, time_limit=time_limit)
+        start_time_pso = time.time()                
+        pso.optimize(num_iterations=num_iterations, max_iterations_without_improvement=mopso_parameters['max_iterations_without_improvement'] if mopso_parameters['exploring_particles'] else 0, time_limit=time_limit, evaluations_max=evaluations_max)
         end_time_pso = time.time()
         optimizers.append(pso)
 
         evaluations_pso = int(sum(pso.evaluations))
+        evaluations_pso_nzz_taken = int(sum(pso.evaluations_nzz_taken))
+        evaluations_pso_nzz_not_taken = int(sum(pso.evaluations_nzz_not_taken))
         pareto_pso = [p.fitness.tolist() for p in pso.pareto_front]
         hv_pso = ind(np.array(pareto_pso))
         time_pso = end_time_pso - start_time_pso
 
         res['models']['pso'] = {'evaluations'  : evaluations_pso,
+                                'evaluations_nzz_taken' : evaluations_pso_nzz_taken,
+                                'evaluations_nzz_not_taken' : evaluations_pso_nzz_not_taken,
                                 'pareto_front' : pareto_pso,
+                                'pareto_front_len' : len(pareto_pso),
                                 'hyper_volume' : hv_pso,
                                 'time'         : time_pso,
+                                'stopped_on_time'         : pso.stopped_on_time,
                             }
         
     if VALID_MODELS[1] in models_to_test:
@@ -158,19 +222,24 @@ def test_seed(objective, mopso_parameters, num_iterations, rl_model, ref_point, 
                             rl_model = rl_model, radius_scaler=mopso_parameters['radius_scaler'])
 
         start_time_pso_trained_policy = time.time() 
-        pso_trained_policy.optimize(num_iterations=num_iterations, time_limit=time_limit)
-        end_time_pso_trained_policy = time.time() 
+        pso_trained_policy.optimize(num_iterations=num_iterations, max_iterations_without_improvement=mopso_parameters['max_iterations_without_improvement'] if mopso_parameters['exploring_particles'] else 0, time_limit=time_limit, evaluations_max=evaluations_max)
+        end_time_pso_trained_policy = time.time()
         optimizers.append(pso_trained_policy)
-
         evaluations_pso_trained_policy = int(sum(pso_trained_policy.evaluations))
+        evaluations_pso_trained_policy_nzz_taken = int(sum(pso_trained_policy.evaluations_nzz_taken))
+        evaluations_pso_trained_policy_nzz_not_taken = int(sum(pso_trained_policy.evaluations_nzz_not_taken))
         pareto_pso_trained_policy = [p.fitness.tolist() for p in pso_trained_policy.pareto_front]
         hv_pso_trained_policy= ind(np.array(pareto_pso_trained_policy))
         time_pso_trained_policy = end_time_pso_trained_policy - start_time_pso_trained_policy
 
         res['models']['pso_trained_policy'] = {'evaluations'  : evaluations_pso_trained_policy,
+                                            'evaluations_nzz_taken' : evaluations_pso_trained_policy_nzz_taken,
+                                            'evaluations_nzz_not_taken' : evaluations_pso_trained_policy_nzz_not_taken,
                                             'pareto_front' : pareto_pso_trained_policy,
+                                            'pareto_front_len' : len(pareto_pso_trained_policy),
                                             'hyper_volume' : hv_pso_trained_policy,
-                                            'time'         : time_pso_trained_policy
+                                            'time'         : time_pso_trained_policy,
+                                            'stopped_on_time'         : pso_trained_policy.stopped_on_time,
                                             }
         
     if VALID_MODELS[2] in models_to_test:
@@ -183,19 +252,24 @@ def test_seed(objective, mopso_parameters, num_iterations, rl_model, ref_point, 
                             rl_model='random', radius_scaler=mopso_parameters['radius_scaler'])
 
         start_time_pso_random_policy = time.time() 
-        pso_random_policy.optimize(num_iterations=num_iterations, time_limit=time_limit)
+        pso_random_policy.optimize(num_iterations=num_iterations, max_iterations_without_improvement=mopso_parameters['max_iterations_without_improvement'] if mopso_parameters['exploring_particles'] else 0, time_limit=time_limit, evaluations_max=evaluations_max)
         end_time_pso_random_policy = time.time()
         optimizers.append(pso_random_policy)
-
         evaluations_pso_random_policy = int(sum(pso_random_policy.evaluations))
+        evaluations_pso_random_policy_nzz_taken = int(sum(pso_random_policy.evaluations_nzz_taken))
+        evaluations_pso_random_policy_nzz_not_taken = int(sum(pso_random_policy.evaluations_nzz_not_taken))
         pareto_pso_random_policy = [p.fitness.tolist() for p in pso_random_policy.pareto_front]
         hv_pso_random_policy= ind(np.array(pareto_pso_random_policy))
         time_random_policy = end_time_pso_random_policy - start_time_pso_random_policy
 
         res['models']['pso_random_policy'] = {'evaluations'  : evaluations_pso_random_policy,
+                                            'evaluations_nzz_taken' : evaluations_pso_random_policy_nzz_taken,
+                                            'evaluations_nzz_not_taken' : evaluations_pso_random_policy_nzz_not_taken,
                                             'pareto_front' : pareto_pso_random_policy,
+                                            'pareto_front_len' : len(pareto_pso_random_policy),
                                             'hyper_volume' : hv_pso_random_policy,
-                                            'time'         : time_random_policy
+                                            'time'         : time_random_policy,
+                                            'stopped_on_time'         : pso_random_policy.stopped_on_time,
                                             }
     if VALID_MODELS[3] in models_to_test:
         if verbose > 1 : print("Starting MOPSO with explainable policy")
@@ -207,70 +281,26 @@ def test_seed(objective, mopso_parameters, num_iterations, rl_model, ref_point, 
                             rl_model='explainable', radius_scaler=mopso_parameters['radius_scaler'])
 
         start_time_pso_explainable_policy = time.time() 
-        pso_explainable_policy.optimize(num_iterations=num_iterations, time_limit=time_limit)
+        pso_explainable_policy.optimize(num_iterations=num_iterations, max_iterations_without_improvement=mopso_parameters['max_iterations_without_improvement'] if mopso_parameters['exploring_particles'] else 0, time_limit=time_limit, evaluations_max=evaluations_max)
         end_time_pso_explainable_policy = time.time()
         optimizers.append(pso_explainable_policy)
 
         evaluations_pso_explainable_policy = int(sum(pso_explainable_policy.evaluations))
+        evaluations_pso_explainable_policy_nzz_taken = int(sum(pso_explainable_policy.evaluations_nzz_taken))
+        evaluations_pso_explainable_policy_nzz_not_taken = int(sum(pso_explainable_policy.evaluations_nzz_not_taken))
         pareto_pso_explainable_policy = [p.fitness.tolist() for p in pso_explainable_policy.pareto_front]
         hv_pso_explainable_policy= ind(np.array(pareto_pso_explainable_policy))
         time_explainable_policy = end_time_pso_explainable_policy - start_time_pso_explainable_policy
 
         res['models']['pso_explainable_policy'] = {'evaluations'  : evaluations_pso_explainable_policy,
+                                                'evaluations_nzz_taken' : evaluations_pso_explainable_policy_nzz_taken,
+                                                'evaluations_nzz_not_taken' : evaluations_pso_explainable_policy_nzz_not_taken,
                                                 'pareto_front' : pareto_pso_explainable_policy,
+                                                'pareto_front_len' : len(pareto_pso_explainable_policy),
                                                 'hyper_volume' : hv_pso_explainable_policy,
-                                                'time'         : time_explainable_policy
+                                                'time'         : time_explainable_policy,
+                                                'stopped_on_time'         : pso_explainable_policy.stopped_on_time,
                                                 }
-
-    # Results
-    # evaluations_pso = int(sum(pso.evaluations))
-    # evaluations_pso_trained_policy = int(sum(pso_trained_policy.evaluations))
-    # evaluations_pso_random_policy = int(sum(pso_random_policy.evaluations))
-    # evaluations_pso_explainable_policy = int(sum(pso_explainable_policy.evaluations))
-
-    # pareto_pso = [p.fitness.tolist() for p in pso.pareto_front]
-    # pareto_pso_trained_policy = [p.fitness.tolist() for p in pso_trained_policy.pareto_front]
-    # pareto_pso_random_policy = [p.fitness.tolist() for p in pso_random_policy.pareto_front]
-    # pareto_pso_explainable_policy = [p.fitness.tolist() for p in pso_explainable_policy.pareto_front]
-
-    # ind = HV(ref_point=ref_point)
-    # hv_pso = ind(np.array(pareto_pso))
-    # hv_pso_trained_policy= ind(np.array(pareto_pso_trained_policy))
-    # hv_pso_random_policy= ind(np.array(pareto_pso_random_policy))
-    # hv_pso_explainable_policy= ind(np.array(pareto_pso_explainable_policy))
-
-    # time_pso = end_time_pso - start_time_pso
-    # time_pso_trained_policy = end_time_pso_trained_policy - start_time_pso_trained_policy
-    # time_random_policy = end_time_pso_random_policy - start_time_pso_random_policy
-    # time_explainable_policy = end_time_pso_explainable_policy - start_time_pso_explainable_policy
-
-    # res =    {'seed'   : seed,
-    #           'models' : {'pso':                    {'evaluations'  : evaluations_pso,
-    #                                                  'pareto_front' : pareto_pso,
-    #                                                  'hyper_volume' : hv_pso,
-    #                                                  'time'         : time_pso,
-    #                                                 },
-
-    #                       'pso_trained_policy':     {'evaluations'  : evaluations_pso_trained_policy,
-    #                                                  'pareto_front' : pareto_pso_trained_policy,
-    #                                                  'hyper_volume' : hv_pso_trained_policy,
-    #                                                  'time'         : time_pso_trained_policy
-    #                                                 },
-
-    #                       'pso_random_policy':      {'evaluations'  : evaluations_pso_random_policy,
-    #                                                  'pareto_front' : pareto_pso_random_policy,
-    #                                                  'hyper_volume' : hv_pso_random_policy,
-    #                                                  'time'         : time_random_policy
-    #                                                 },
-
-    #                       'pso_explainable_policy': {'evaluations'  : evaluations_pso_explainable_policy,
-    #                                                 'pareto_front' : pareto_pso_explainable_policy,
-    #                                                 'hyper_volume' : hv_pso_explainable_policy,
-    #                                                 'time'         : time_explainable_policy
-    #                                                 }
-    #                     }
-    #           }
-    
     return res
 
 def plot_pareto_2d(paretos, seed, known_pareto = None):
@@ -341,29 +371,57 @@ def plot_pareto_3d(paretos, seed, known_pareto = None):
 
 def explainability(rl_model, num_points):
     model = PPO.load(rl_model)
-    res = np.empty((num_points,num_points))
-    for x in range(num_points):
-        for y in range(num_points):
-            res[y,x] = model.predict([x, y, 0], deterministic=True)[0].tolist()
 
-    res[0][0] = 1.
+    if type(num_points) is list or tuple:
+        max_bad=num_points[0]
+        max_good=num_points[1]
+    else:
+        max_bad=num_points
+        max_good=num_points
+
+    res = np.empty((max_good, max_bad))
+
+    for x in range(max_bad):
+        for y in range(max_good):
+            res[y,x] = model.predict([x, y], deterministic=True)[0].tolist()
+
+    # res[0][0] = 1.
+
+    lw = 2
+    ls = 16
+    fs = 18
+    leg_fs = 14
 
     cmap = mcolors.ListedColormap(['red', 'limegreen'])
-    plt.imshow(res, cmap=cmap, vmin=0, vmax=1, origin='lower')
-    ax = plt.gca()
-    ax.set_xticks(np.arange(0, num_points - 1, 5))
-    ax.set_yticks(np.arange(0, num_points - 1, 5))
 
-    plt.xlabel("Bad points")
-    plt.ylabel("Pareto points")
+    # Crea i livelli del contorno
+    levels = [-1, 0, 1]
 
-    # x = np.linspace(0, num_points)
-    # y = 5 * x
-    # plt.plot(x, y, label=f'y = {5}x', color = 'black')
-    # plt.legend()
-    rect1 = mpatches.Patch(color=cmap.colors[0], label='Not evaluated')
-    rect2 = mpatches.Patch(color=cmap.colors[1], label='Evaluated')
-    plt.legend(handles=[rect1, rect2])
+    fig, ax = plt.subplots(figsize=(8,8))
+    # Plot dei contorni con hatches (linee diagonali)
+    plt.contourf(res, levels=levels, cmap=cmap, alpha=0.5)
+    contours = plt.contour(res, levels=levels, colors='black')
+
+    # Aggiungi le hatches
+    plt.contourf(res, levels=levels, colors='none', hatches=['/', '\\'], alpha=0)
+    # ax.set_xticks(np.arange(0, num_points - 1, 5))
+    # ax.set_yticks(np.arange(0, num_points - 1, 5))
+
+    plt.xlabel("Dominated points",fontweight='bold', fontsize=fs)
+    plt.ylabel("Archive points",fontweight='bold', fontsize=fs)
+    rect1 = patches.Patch(facecolor='red', edgecolor=None, hatch='/', linewidth=lw)
+    rect2 = patches.Patch(facecolor='limegreen', edgecolor=None, hatch='\\', linewidth=lw)
+    
+    labels=['Skipped', 'Evaluated']
+
+    plt.legend(prop={'weight':'bold', 'size': leg_fs}, scatterpoints=1, markerscale=2, fontsize=fs, handles=[rect1, rect2], labels=labels, loc='upper right')
+    ax.spines['top'].set_linewidth(lw)
+    ax.spines['right'].set_linewidth(lw)
+    ax.spines['left'].set_linewidth(lw)
+    ax.spines['bottom'].set_linewidth(lw)
+    ax.tick_params(axis='both', which='major', labelsize=ls, width=2)
+    plt.xticks(ax.get_xticks()[:-1], weight = 'bold')
+    plt.yticks(ax.get_yticks()[:-1], weight = 'bold')
 
     head_tail = os.path.split(rl_model)
     plt.savefig(f"{head_tail[0]}/explainability_{head_tail[1]}.png")

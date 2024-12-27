@@ -5,12 +5,12 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 import os
 
-num_agents = 100
+num_agents = 200
 num_iterations = 200
 num_params = 11
 
 lb = [0] * num_params
-ub = [1073741825] * num_params
+ub = [1073741823] + [31] * (num_params - 1)
 
 
 def zdt5_objective1(x):
@@ -39,6 +39,7 @@ def v(x):
     elif un == 5:
         return 1
     else:
+        print('upsi')
         return 0
 
 
@@ -53,21 +54,39 @@ objective = optimizer.ElementWiseObjective([zdt5_objective1, zdt5_objective2])
 
 pso = optimizer.MOPSO(objective=objective, lower_bounds=lb, upper_bounds=ub,
                       num_particles=num_agents,
-                      inertia_weight=0.5, cognitive_coefficient=2, social_coefficient=0.5, initial_particles_position='random')
+                      inertia_weight=0.9, cognitive_coefficient=2, social_coefficient=2, initial_particles_position='random', topology='round_robin', exploring_particles=False, scaler=0.065)
 
 # run the optimization algorithm
-pso.optimize(num_iterations)
+pso.optimize(num_iterations, max_iterations_without_improvement=5)
 
-fig, ax = plt.subplots()
+fig, ax = plt.subplots(figsize=(10,10))
 
 pareto_front = pso.pareto_front
 n_pareto_points = len(pareto_front)
 pareto_x = [particle.fitness[0] for particle in pareto_front]
 pareto_y = [particle.fitness[1] for particle in pareto_front]
 
-real_x = np.array([u(x) for x in np.linspace(0, 1073741825, n_pareto_points, dtype=np.int_)]) + 1
-real_y = [10 / (1 + u(x)) for x in real_x]
-plt.scatter(real_x, real_y, s=5, c='red')
-plt.scatter(pareto_x, pareto_y, s=5)
+real_x = np.array([u(x) for x in np.linspace(0, 1073741823, 100000, dtype=np.int_)])
+real_y = [10 / (1 + x) for x in real_x]
+plt.scatter(real_x, real_y, s=70, c='red', label = 'Known optimal Pareto front')
+plt.scatter(pareto_x, pareto_y, s=70, label = 'Pareto front')
 
-plt.savefig(optimizer.FileManager.working_dir + 'pf.png')
+lw = 4
+ls = 20
+fs = 22
+leg_fs = 16
+ax.spines['top'].set_linewidth(lw)
+ax.spines['right'].set_linewidth(lw)
+ax.spines['left'].set_linewidth(lw)
+ax.spines['bottom'].set_linewidth(lw)
+ax.tick_params(axis='both', which='major', labelsize=ls, width=2)
+plt.xticks(ax.get_xticks()[1:-1], weight = 'bold')
+plt.yticks(ax.get_yticks()[1:-1], weight = 'bold')
+plt.legend(prop={'weight':'bold', 'size': leg_fs}, scatterpoints=1, markerscale=2, fontsize=fs)
+plt.title('ZDT 5', fontweight='bold', fontsize=fs + 2)
+plt.xlabel('Objective 1', fontweight='bold', fontsize=fs)
+plt.ylabel('Objective 2', fontweight='bold', fontsize=fs)
+
+plt.savefig('tmp/zdt5.png')
+
+np.save("zdt5.npy",np.array([pareto_x, pareto_y]))

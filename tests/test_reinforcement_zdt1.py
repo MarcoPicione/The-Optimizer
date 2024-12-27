@@ -42,7 +42,7 @@ rl_model = './models/model_periodic/model'
 # rl_model = './models/model_periodic_parallel/model'
 # rl_model = './models/model_new_reward_hv_diff/model' #attached 2
 rl_model = './models/model_0_120_n1_2_periodic/model'
-rl_model = './model_exp_hv_100_0_2_model'
+rl_model = './model_particle_hv_100_0_0_1000agents_model'
 ref_point = [5, 5]
 seeds = list(range(50, 150))
 print(seeds)

@@ -33,8 +33,6 @@ class MaskedActorCriticPolicy(ActorCriticPolicy):
             if mask[i][0] == 0 and mask[i][1] == 0:
                 logits[i][0] += -1e9
 
-        # print("LOGITS ", logits)
-
         action_dist = self.action_dist.proba_distribution(logits)
         actions = action_dist.get_actions(deterministic=deterministic)
         # print("state: ", obs_tensor)

@@ -34,7 +34,8 @@ class CustomCallback(BaseCallback):
         self.keys = self.locals["self"].env.unwrapped.vec_envs[0].par_env.agents
         self.cumulative_episode_reward = {k : [] for k in self.keys}
         self.rewards = {k : [] for k in self.keys}
-        self.num_timesteps 
+        self.num_timesteps
+        self.hvs = []
 
     def _on_rollout_start(self) -> None:
         """
@@ -62,12 +63,33 @@ class CustomCallback(BaseCallback):
                 self.cumulative_episode_reward[k].append(np.sum(self.rewards[k]))
             self.rewards = {k : [] for k in self.keys}
 
+        # self.locals["model"].env.unwrapped.vec_envs[0].par_env.aec_env.env.hv
+        
+        # pareto_front = self.model.env.unwrapped.vec_envs[0].par_env.aec_env.env.pso.pareto_front
+        # n_pareto_points = len(pareto_front)
+        # pareto_x = [particle.fitness[0] for particle in pareto_front]
+        # pareto_y = [particle.fitness[1] for particle in pareto_front]
+        # real_x = (np.linspace(0, 1, n_pareto_points))
+        # real_y = 1-np.sqrt(real_x)
+        # plt.scatter(real_x, real_y, s=70, c='red', label = 'Known optimal Pareto front')
+        # plt.scatter(pareto_x, pareto_y, s=70, label= 'Pareto front')
+        # plt.savefig(f"./iter{self.n_calls-1}")
+        # plt.close()
+
+        hv = self.model.env.unwrapped.vec_envs[0].par_env.aec_env.env.hv
+        self.hvs.append(hv)
+
+        # iter = self.model.env.unwrapped.vec_envs[0].par_env.aec_env.env.pso.iteration
+        # print(iter)
+        print(f"call {self.n_calls}")
         return True
 
     def _on_rollout_end(self) -> None:
         """
         This event is triggered before updating the policy.
         """
+        print(f"UPDATE step{self.n_calls}")
+
         pass
 
     def _on_training_end(self) -> None:
@@ -89,7 +111,9 @@ class CustomCallback(BaseCallback):
         plt.savefig(f"{self.name}_Cumulative_episodes_rewards.png")
         plt.close()
 
-        # plt.figure()
-        # plt.plot(self.hvs)
-        # plt.savefig(f"{self.name}_hvs.png")
-        # plt.close()
+        plt.figure()
+        plt.plot(self.hvs)
+        plt.savefig(f"{self.name}_hvs.png")
+        plt.close()
+
+        np.save(f"{self.name}_observed_states.npy", self.model.env.unwrapped.vec_envs[0].par_env.aec_env.env.observed_states)

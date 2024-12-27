@@ -11,28 +11,34 @@ from tqdm import tqdm
 import torch as th
 from optimizer.masked_actor_critic import MaskedActorCriticPolicy
 
-def train(env_fn, steps: int = 1e4, seed: int = 0, name = '', **env_kwargs):
+def train(env_fn, steps: int = 1e4, seed: int = 0, name = '', pre_trained_model = None, **env_kwargs):
     env = env_fn.parallel_env(**env_kwargs)
     env = ss.pettingzoo_env_to_vec_env_v1(env)
     env = ss.concat_vec_envs_v1(env, num_vec_envs = 1, num_cpus=1, base_class="stable_baselines3")
-    env.reset()
+    # env.reset()
     print("Observation Space:", env.observation_space)
     print("Action Space:", env.action_space)
 
     policy_kwargs = dict(activation_fn=th.nn.Tanh,
                      net_arch=dict(pi=[5, 5], vf=[5, 5]))
-    
-    model = PPO(
+
+    if pre_trained_model is not None:
+        model = PPO.load(pre_trained_model)
+        model.set_env(env)
+    else:
+        model = PPO(
         MaskedActorCriticPolicy,
         env,
-        verbose=2,
-        learning_rate=1e-5,
-        gamma = 1,
+        verbose=0,
+        learning_rate=0.0003,#1e-5,
+        gamma = 0.99,
         n_steps= int(0.2 * env_kwargs['pso_iterations']),
-        batch_size=100,
-        n_epochs = 10,
+        batch_size=5,
+        n_epochs = 5,
+        ent_coef = 0,
         policy_kwargs=policy_kwargs
     )
+
     print("-" * 100)
     print("MODEL:")
     print(model.policy)

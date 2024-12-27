@@ -52,7 +52,7 @@ class Randomizer:
 
 
 class FileManager:
-    saving_enabled = True
+    saving_enabled = False
     loading_enabled = False
     working_dir = "tmp"
 

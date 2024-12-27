@@ -7,44 +7,41 @@ import os
 import copy
 from pymoo.indicators.hv import HV
 
-num_agents = 100
-num_iterations = 300
-num_params = 10
+num_agents = 50
+num_iterations = 100
+num_params = 3
 
-lb = [0.] + [-5.] * (num_params - 1)
-ub = [1.] + [5.] * (num_params - 1)
+lb = [-10.] * num_params
+ub = [10.] * num_params
 
 optimizer.Logger.setLevel('ERROR')
 
-def zdt4_objective1(x):
-    return x[0]
+def objective1(x):
+    return np.cos(x[0])*np.sin(x[1])*x[0]*x[1]*x[2] + 10
 
+def objective2(x):
+    return np.cos(x[0]-2)*np.sin(x[1])*(x[0]- 2)*x[1]*x[2]
 
-def zdt4_objective2(x):
-    f1 = x[0]
-    g = 1.0 + 10 * (len(x) - 1) + sum([i**2 - 10 * np.cos(4 * np.pi * i) for i in x[1:]])
-    h = 1.0 - np.sqrt(f1 / g)
-    f2 = g * h
-    return f2
+objective = optimizer.ElementWiseObjective([objective1, objective2])
 
-optimizer.FileManager.working_dir = "tmp/zdt4/"
+optimizer.FileManager.working_dir = "tmp/zdt1/"
 optimizer.FileManager.loading_enabled = False
 optimizer.FileManager.saving_enabled = False
 
-objective = optimizer.ElementWiseObjective([zdt4_objective1, zdt4_objective2])
-
-topologies = ['lower_weighted_crowding_distance', 'random', 'round_robin', 'lower_crowding_distance']
+# topologies = ['lower_weighted_crowding_distance', 'random', 'round_robin', 'lower_crowding_distance']
+topologies = ['round_robin']
 
 paretos = []
 seeds = list(range(50,150))
 # markers = ['.', 's', '1', 'x', 'v']
-ref_point = [50, 50]
+ref_point = [600,600] #Dominated by nadir point
 ind = HV(ref_point=ref_point)
 hvs = np.empty((len(topologies), len(seeds)))
 
-inertia_weight = 0.4
+inertia_weight = 0.9
 cognitive_coefficient = 1
 social_coefficient = 2
+
 for i, t in enumerate(topologies):
     # fig, ax = plt.subplots()
     # plt.scatter(real_x, real_y, s=5, c='red', marker = "*",label = "Real pareto")
@@ -62,6 +59,7 @@ for i, t in enumerate(topologies):
         pareto_front = pso.pareto_front
         hv = ind(np.array([p.fitness for p in pareto_front]))
         hvs[i][j] = hv
+        print(hv)
         # paretos.append(copy.deepcopy(pso.pareto_front))
         # pareto_x = [particle.fitness[0] for particle in pareto_front]
         # pareto_y = [particle.fitness[1] for particle in pareto_front]
@@ -72,7 +70,7 @@ for i, t in enumerate(topologies):
     # plt.legend()
     # plt.savefig(f"./plots/topology_{t}")
     # plt.close()
-name = f"hyper_volumes_zdt4_agents_{num_agents}_iter_{num_iterations}_inertia_{inertia_weight}_cognitive_{cognitive_coefficient}_social_{social_coefficient}.npy"
+name = f"hyper_volumes_zdt1_agents_{num_agents}_iter_{num_iterations}_inertia_{inertia_weight}_cognitive_{cognitive_coefficient}_social_{social_coefficient}.npy"
 np.save(name, hvs)
 mean = np.mean(hvs, axis = 1)
 err = np.std(hvs, axis = 1)

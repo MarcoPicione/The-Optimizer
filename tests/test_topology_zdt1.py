@@ -33,22 +33,20 @@ optimizer.FileManager.saving_enabled = False
 
 objective = optimizer.ElementWiseObjective([zdt1_objective1, zdt1_objective2])
 
-topologies = ['lower_weighted_crowding_distance'
-            # 'random', 'higher_crowding_distance', 'lower_crowding_distance', 'higher_weighted_crowding_distance',
-            # 'lower_weighted_crowding_distance', 'round_robin', 'higher_crowding_distance_random_ring', 
-            # 'lower_crowding_distance_random_ring'
-            ]
+# topologies = ['lower_weighted_crowding_distance', 'random', 'round_robin', 'lower_crowding_distance']
+topologies = ['lower_crowding_distance']
 
 paretos = []
 seeds = list(range(50,150))
 # markers = ['.', 's', '1', 'x', 'v']
-ref_point = [5, 5]
+ref_point = [1.1, 1.1] #Dominated by nadir point
 ind = HV(ref_point=ref_point)
 hvs = np.empty((len(topologies), len(seeds)))
 
 inertia_weight = 0.4
-cognitive_coefficient = 1
+cognitive_coefficient = 1.5
 social_coefficient = 2
+
 for i, t in enumerate(topologies):
     # fig, ax = plt.subplots()
     # plt.scatter(real_x, real_y, s=5, c='red', marker = "*",label = "Real pareto")
@@ -58,14 +56,15 @@ for i, t in enumerate(topologies):
         pso = optimizer.MOPSO(objective=objective, lower_bounds=lb, upper_bounds=ub,
                             num_particles=num_agents,
                             inertia_weight=inertia_weight, cognitive_coefficient=cognitive_coefficient, social_coefficient=social_coefficient, 
-                            initial_particles_position='random', incremental_pareto=False,
-                            topology = t, seed = s)
+                            initial_particles_position='random',
+                            topology = t)
 
         # run the optimization algorithm
         pso.optimize(num_iterations)
         pareto_front = pso.pareto_front
         hv = ind(np.array([p.fitness for p in pareto_front]))
         hvs[i][j] = hv
+        print(hv)
         # paretos.append(copy.deepcopy(pso.pareto_front))
         # pareto_x = [particle.fitness[0] for particle in pareto_front]
         # pareto_y = [particle.fitness[1] for particle in pareto_front]
@@ -81,7 +80,7 @@ np.save(name, hvs)
 mean = np.mean(hvs, axis = 1)
 err = np.std(hvs, axis = 1)
 for i,t in enumerate(topologies):
-    print(f"{t}: {mean[i]} +- {err[i] / np.sqrt(len(seeds))}")
+    print(f"{t}: {mean[i]} +- {err[i]}")
     # print(f"std: {err[i]}")
 
 real_x = (np.linspace(0, 1, 100))
